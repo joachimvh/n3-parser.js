@@ -12,9 +12,21 @@ function N3Parser ()
 // TODO: no numeric literals yet
 // TODO: should extend this to correct characters
 // TODO: check this for more annoying examples
-N3Parser._literalRegex = /("|')(.*?[^\\])?(\\\\)*\1((\^\^((<[^>]*>)|([a-zA-Z0-9]*:[a-zA-Z0-9]+)))|(@[a-z]+(-[a-z0-9]+)*))?/g;
-N3Parser._iriRegex = /<[^\u0000-\u0020<>"{}|^`\\]*>/g;
-N3Parser._prefixIriRegex = /[a-zA-Z0-9]*:[a-zA-Z0-9]+/g; // TODO: needs correct characters, only works because all other things should have disappeared at this point
+N3Parser._prefixFirst = /[A-Z_a-z\u00c0-\u00d6\u00d8-\u00f6\u00f8-\u02ff\u0370-\u037d\u037f-\u1fff\u200c-\u200d\u2070-\u218f\u2c00-\u2fef\u3001-\ud7ff\uf900-\ufdcf\ufdf0-\ufffd]/g;
+N3Parser._prefixRest = /[-_0-9\u00b7\u0300-\u036f\u203f-\u2040]/g;
+N3Parser._prefix = new RegExp(
+    '(' + N3Parser._prefixFirst.source + '((' + N3Parser._prefixRest + '|\.)*' + N3Parser._prefixRest + ')?)?'
+);
+N3Parser._stringRegex = /("|')(\1\1|)(.*?[^\\])??(\\\\)*(\2)\1/g;
+N3Parser._datatypeRegex = /\^\^((<[^>]*>)|([a-zA-Z0-9]*:[a-zA-Z0-9]+))/g;
+N3Parser._langRegex = /@[a-z]+(-[a-z0-9]+)*/g;
+N3Parser._literalRegex = new RegExp(
+    N3Parser._stringRegex.source +
+    "((" + N3Parser._datatypeRegex.source + ")|(" + N3Parser._langRegex.source + "))",
+    "g"
+);
+N3Parser._iriRegex = /<[^>]*>/g;
+N3Parser._prefixIriRegex = /\W*:\W+/g; // TODO: needs correct characters, only works because all other things should have disappeared at this point
 
 N3Parser.prototype.parse = function (n3String)
 {
@@ -27,6 +39,8 @@ N3Parser.prototype.parse = function (n3String)
     var jsonld = this._statementsOptional({tokens: tokens});
     jsonld = this._revertMatches(jsonld, _.invert(replacementMap));
     console.log(JSON.stringify(jsonld, null, 4));
+
+    // TODO: update literals that are currently represented as URIs
 };
 
 N3Parser.prototype._replaceMatches = function (string, regex, map)
@@ -78,11 +92,15 @@ N3Parser.prototype._statementsOptional = function (result)
     if (result.tokens.length === 0)
         return {};
 
+    var dotExpected = result.tokens[0] !== 'PREFIX' && result.tokens[0] !== 'BASE';
     var statement = this._statement(result);
 
-    var dot = result.tokens.shift(); // TODO: special case with PREFIX/BASE
-    if (dot !== '.')
-        throw "Error: expected '.' but got " + dot; // TODO: better error reporting would be nice
+    if (dotExpected)
+    {
+        var dot = result.tokens.shift();
+        if (dot !== '.')
+            throw "Error: expected '.' but got " + dot; // TODO: better error reporting would be nice
+    }
 
     // TODO: extend problem possible in deeper levels?
     var statements = this._statementsOptional(result);
@@ -94,14 +112,11 @@ N3Parser.prototype._statementsOptional = function (result)
 
 N3Parser.prototype._statement = function (result)
 {
-    if (result.tokens[0] === '@base' || result.tokens[0] === '@prefix' || result.tokens[0] === '@keywords')
+    if (result.tokens[0] === '@base' || result.tokens[0] === 'BASE' || result.tokens[0] === '@prefix' || result.tokens[0] === 'PREFIX' || result.tokens[0] === '@keywords')
         return this._declaration(result);
 
-    if (result.tokens[0] === '@forAll')
-        return this._universal(result);
-
-    if (result.tokens[0] === '@forSome')
-        return this._existential(result);
+    if (result.tokens[0] === '@forAll' || result.tokens[0] === '@forSome')
+        return this._quantification(result);
 
     return this._simpleStatement(result);
 };
@@ -111,17 +126,17 @@ N3Parser.prototype._declaration = function (result)
 {
     var declaration = result.tokens.shift(); // TODO: handle incorrect array lengths
 
-    if (declaration === '@base')
+    if (declaration === '@base' || declaration === 'BASE')
     {
         var uri = results.tokens.shift();
         return { '@context': { '@base': uri}};
     }
-    else if (declaration === '@prefix')
+    else if (declaration === '@prefix' || declaration === 'PREFIX')
     {
         var prefix = result.tokens.shift();
         var uri = result.tokens.shift();
         if (prefix === ':')
-            return result.jsonld, { '@context': { '@vocab': uri}};
+            return { '@context': { '@vocab': uri}};
         else
         {
             var key = prefix.slice(0, -1);
@@ -144,9 +159,9 @@ N3Parser.prototype._declaration = function (result)
 };
 
 // TODO: these are actually not supported JSON-LD, just adding them for completeness
-N3Parser.prototype._universal = function (result)
+N3Parser.prototype._quantification = function (result)
 {
-    result.tokens.shift();
+    var quantifier = result.tokens.shift();
     var symbols = [];
     while (result.tokens[0] !== '.')
     {
@@ -155,21 +170,7 @@ N3Parser.prototype._universal = function (result)
             result.tokens[0].shift();
     }
     var jsonld = {};
-    jsonld['@forAll'] = symbols;
-    return {'@graph': [jsonld]};
-};
-N3Parser.prototype._existential = function (result)
-{
-    result.tokens.shift();
-    var symbols = [];
-    while (result.tokens[0] !== '.')
-    {
-        symbols.push(result.tokens[0].shift());
-        if (result.tokens[0] === ',')
-            result.tokens[0].shift();
-    }
-    var jsonld = {};
-    jsonld['@forSome'] = symbols;
+    jsonld[quantifier] = symbols;
     return {'@graph': [jsonld]};
 };
 
@@ -182,7 +183,6 @@ N3Parser.prototype._simpleStatement = function (result)
 
 N3Parser.prototype._subject = function (result)
 {
-    // TODO: obviously not always correct
     return { '@id': this._expression(result) };
 };
 
@@ -200,11 +200,8 @@ N3Parser.prototype._pathitem = function (result)
         return this._propertylist(result);
     else if (result.tokens[0] === '(')
         return this._pathlist(result);
-    else {
-        // TODO: let's assume all literals have been mapped already
-        // TODO: we're actually not differentiating between uri's and literals at this point? just assuming everything is uri at this point
+    else
         return result.tokens.shift();
-    }
 };
 
 N3Parser.prototype._pathlist = function (result)
@@ -253,7 +250,13 @@ N3Parser.prototype._propertylist = function (result)
         objects.push(this._object(result));
     }
     var jsonld = {};
-    jsonld[predicate] = objects;
+    if (predicate['@reverse'])
+    {
+        jsonld['@reverse'] = {};
+        jsonld['@reverse'][predicate['@reverse']] = objects;
+    }
+    else
+        jsonld[predicate] = objects;
     if (result.tokens[0] === ';')
     {
         result.tokens.shift();
@@ -264,17 +267,49 @@ N3Parser.prototype._propertylist = function (result)
     return jsonld;
 };
 
+// TODO: what to do with predicates with empty prefix?
 N3Parser.prototype._predicate = function (result)
 {
-    // TODO: all the other types of expressions possible
-    return this._expression(result);
+    if (result.tokens[0] === '@has')
+    {
+        result.tokens[0].shift(); // @has
+        return this._expression(result);
+    }
+    else if (result.tokens[0] === '@is')
+    {
+        result.tokens[0].shift(); // @is
+        var pred = this._expression(result);
+        result.tokens[0].shift(); // @of
+        return {'@reverse': pred};
+    }
+    else if (result.tokens === '@a')
+    {
+        result.tokens[0].shift(); // @a
+        return 'http://www.w3.org/1999/02/22-rdf-syntax-ns#';
+    }
+    else if (result.tokens === '=')
+    {
+        result.tokens[0].shift(); // =
+        return 'http://www.w3.org/2002/07/owl#equivalentTo';
+    }
+    else if (result.tokens === '=>')
+    {
+        result.tokens[0].shift(); // =>
+        return 'http://www.w3.org/2000/10/swap/log#implies';
+    }
+    else if (result.tokens === '<=')
+    {
+        result.tokens[0].shift(); // <=
+        return {'@reverse': 'http://www.w3.org/2000/10/swap/log#implies'};
+    }
+    else
+        return this._expression(result);
 };
 
 N3Parser.prototype._object = function (result)
 {
-    // TODO: check for literal/uri here or later?
     var object = this._expression(result);
-    return _.isString(object) ? { '@id': object} : object;
+    return _.isString(object) ? { '@id': object} : object; // object can also be a graph/array/etc.
 };
 
 var parser = new N3Parser();
