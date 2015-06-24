@@ -22,12 +22,12 @@ N3Parser._datatypeRegex = /\^\^((<[^>]*>)|([a-zA-Z0-9]*:[a-zA-Z0-9]+))/g;
 N3Parser._langRegex = /@[a-z]+(-[a-z0-9]+)*/g;
 N3Parser._literalRegex = new RegExp(
     N3Parser._stringRegex.source +
-    "((" + N3Parser._datatypeRegex.source + ")|(" + N3Parser._langRegex.source + "))",
+    "((" + N3Parser._datatypeRegex.source + ")|(" + N3Parser._langRegex.source + "))?",
     "g"
 );
 N3Parser._numericalRegex = /[-+]?[0-9]+(\\.[0-9]*)?([eE][-+]?[0-9]+)?/g;
 N3Parser._iriRegex = /<[^>]*>/g;
-N3Parser._prefixIriRegex = /\W*:\W+/g; // TODO: needs correct characters, only works because all other things should have disappeared at this point
+N3Parser._prefixIriRegex = /[a-zA-Z0-9]*:[a-zA-Z0-9]+/g; // TODO: needs correct characters, only works because all other things should have disappeared at this point
 
 N3Parser.prototype.parse = function (n3String)
 {
@@ -42,6 +42,8 @@ N3Parser.prototype.parse = function (n3String)
     console.log(JSON.stringify(jsonld, null, 4));
 
     // TODO: update literals that are currently represented as URIs
+    // TODO: simplification (replace arrays with 1 element)
+    // TODO: string literals get double ticks in the JSON-LD output
 };
 
 N3Parser.prototype._replaceMatches = function (string, regex, map)
@@ -309,9 +311,12 @@ N3Parser.prototype._combinePredicateObjects = function (predicate, objects)
 {
     // simple URIs get converted to { @id: URI}, this needs to be changed for predicates
     // TODO: sort of ugly, maybe move the @id part to somewhere later? (might then give problems with subjects though
-    var keys = Object.keys(predicate);
-    if (keys.length === 1 && keys[0] === '@id')
-        predicate = predicate['@id'];
+    if (!_.isString(predicate))
+    {
+        var keys = Object.keys(predicate);
+        if (keys.length === 1 && keys[0] === '@id')
+            predicate = predicate['@id'];
+    }
 
     var jsonld = {};
     if (predicate['@reverse'])
@@ -338,34 +343,35 @@ N3Parser.prototype._predicate = function (tokens)
 {
     if (tokens[0] === '@has')
     {
-        tokens[0].shift(); // @has
+        tokens.shift(); // @has
         return this._expression(tokens);
     }
     else if (tokens[0] === '@is')
     {
-        tokens[0].shift(); // @is
+        tokens.shift(); // @is
         var pred = this._expression(tokens);
-        tokens[0].shift(); // @of
+        tokens.shift(); // @of
         return {'@reverse': pred};
     }
-    else if (tokens === '@a')
+    // TODO: @type doesn't require an @id for the predicate?
+    else if (tokens[0] === '@a' || tokens[0] === 'a')
     {
-        tokens[0].shift(); // @a
+        tokens.shift(); // @a
         return '@type';
     }
-    else if (tokens === '=')
+    else if (tokens[0] === '=')
     {
-        tokens[0].shift(); // =
+        tokens.shift(); // =
         return 'http://www.w3.org/2002/07/owl#equivalentTo';
     }
-    else if (tokens === '=>')
+    else if (tokens[0] === '=>')
     {
-        tokens[0].shift(); // =>
+        tokens.shift(); // =>
         return 'http://www.w3.org/2000/10/swap/log#implies';
     }
-    else if (tokens === '<=')
+    else if (tokens[0] === '<=')
     {
-        tokens[0].shift(); // <=
+        tokens.shift(); // <=
         return {'@reverse': 'http://www.w3.org/2000/10/swap/log#implies'};
     }
     else
@@ -378,5 +384,6 @@ N3Parser.prototype._object = function (tokens)
 };
 
 var parser = new N3Parser();
-parser.parse(':Plato :says { :Socrates :is :mortal }.');
+//parser.parse(':Plato :says { :Socrates :is :mortal }.');
 //parser.parse('[:A :b] :is :Socrates.');
+parser.parse('@prefix gr: <http://purl.org/goodrelations/v1#> . <http://www.acme.com/#store> a gr:Location; gr:hasOpeningHoursSpecification [ a gr:OpeningHoursSpecification; gr:opens "08:00:00"; gr:closes "20:00:00"; gr:hasOpeningHoursDayOfWeek gr:Friday, gr:Monday, gr:Thursday, gr:Tuesday, gr:Wednesday ]; gr:name "Hepp\'s Happy Burger Restaurant" .');
