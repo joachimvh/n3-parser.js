@@ -17,7 +17,7 @@ N3Parser._prefixRest = /[-_0-9\u00b7\u0300-\u036f\u203f-\u2040]/g;
 N3Parser._prefix = new RegExp(
     '(' + N3Parser._prefixFirst.source + '((' + N3Parser._prefixRest + '|\.)*' + N3Parser._prefixRest + ')?)?'
 );
-N3Parser._stringRegex = /("|')(\1\1|)(.*?[^\\])??(\\\\)*(\2)\1/g;
+N3Parser._stringRegex = /("|')(\1\1)?(?:[^]*?[^\\])??(?:\\\\)*\2\1/g;
 N3Parser._datatypeRegex = /\^\^((<[^>]*>)|([a-zA-Z0-9]*:[a-zA-Z0-9]+))/g;
 N3Parser._langRegex = /@[a-z]+(-[a-z0-9]+)*/g;
 N3Parser._literalRegex = new RegExp(
@@ -25,6 +25,7 @@ N3Parser._literalRegex = new RegExp(
     "((" + N3Parser._datatypeRegex.source + ")|(" + N3Parser._langRegex.source + "))",
     "g"
 );
+N3Parser._numericalRegex = /[-+]?[0-9]+(\\.[0-9]*)?([eE][-+]?[0-9]+)?/g;
 N3Parser._iriRegex = /<[^>]*>/g;
 N3Parser._prefixIriRegex = /\W*:\W+/g; // TODO: needs correct characters, only works because all other things should have disappeared at this point
 
@@ -36,7 +37,7 @@ N3Parser.prototype.parse = function (n3String)
     n3String = this._replaceMatches(n3String, N3Parser._prefixIriRegex, replacementMap);
 
     var tokens = n3String.split(/\s+|([;.,{}[\]()])|(<?=>?)/).filter(Boolean); // splits and removes empty elements
-    var jsonld = this._statementsOptional({tokens: tokens});
+    var jsonld = this._statementsOptional(tokens);
     jsonld = this._revertMatches(jsonld, _.invert(replacementMap));
     console.log(JSON.stringify(jsonld, null, 4));
 
@@ -87,44 +88,44 @@ N3Parser.prototype._revertMatches = function (jsonld, invertedMap)
     return result;
 };
 
-N3Parser.prototype._statementsOptional = function (result)
+N3Parser.prototype._statementsOptional = function (tokens)
 {
-    if (result.tokens.length === 0)
+    if (tokens.length === 0)
         return {};
 
-    var dotExpected = result.tokens[0] !== 'PREFIX' && result.tokens[0] !== 'BASE';
-    var statement = this._statement(result);
+    var dotExpected = tokens[0] !== 'PREFIX' && tokens[0] !== 'BASE';
+    var statement = this._statement(tokens);
 
     if (dotExpected)
     {
-        var dot = result.tokens.shift();
+        var dot = tokens.shift();
         if (dot !== '.')
             throw "Error: expected '.' but got " + dot; // TODO: better error reporting would be nice
     }
 
     // TODO: extend problem possible in deeper levels?
-    var statements = this._statementsOptional(result);
+    var statements = this._statementsOptional(tokens);
     if (statement['@graph'] && statements['@graph'])
         statements['@graph'] = statement['@graph'].concat(statements['@graph']);
     return _.extend(statement, statements);
 };
 
 
-N3Parser.prototype._statement = function (result)
+N3Parser.prototype._statement = function (tokens)
 {
-    if (result.tokens[0] === '@base' || result.tokens[0] === 'BASE' || result.tokens[0] === '@prefix' || result.tokens[0] === 'PREFIX' || result.tokens[0] === '@keywords')
-        return this._declaration(result);
+    if (tokens[0] === '@base' || tokens[0] === 'BASE' || tokens[0] === '@prefix' || tokens[0] === 'PREFIX' || tokens[0] === '@keywords')
+        return this._declaration(tokens);
 
-    if (result.tokens[0] === '@forAll' || result.tokens[0] === '@forSome')
-        return this._quantification(result);
+    if (tokens[0] === '@forAll' || tokens[0] === '@forSome')
+        return this._quantification(tokens);
 
-    return this._simpleStatement(result);
+    return this._simpleStatement(tokens);
 };
 
 // TODO: uri validation and so on? (just run it through an n3 validator first?)
-N3Parser.prototype._declaration = function (result)
+N3Parser.prototype._declaration = function (tokens)
 {
-    var declaration = result.tokens.shift(); // TODO: handle incorrect array lengths
+    var declaration = tokens.shift(); // TODO: handle incorrect array lengths
 
     if (declaration === '@base' || declaration === 'BASE')
     {
@@ -133,8 +134,8 @@ N3Parser.prototype._declaration = function (result)
     }
     else if (declaration === '@prefix' || declaration === 'PREFIX')
     {
-        var prefix = result.tokens.shift();
-        var uri = result.tokens.shift();
+        var prefix = tokens.shift();
+        var uri = tokens.shift();
         if (prefix === ':')
             return { '@context': { '@vocab': uri}};
         else
@@ -149,168 +150,214 @@ N3Parser.prototype._declaration = function (result)
     else if (declaration === '@keywords')
     {
         var keywords = [];
-        while (result.tokens[0] !== '.')
+        while (tokens[0] !== '.')
         {
-            keywords.push(result.tokens[0].shift());
-            if (result.tokens[0] === ',')
-                result.tokens[0].shift();
+            keywords.push(tokens[0].shift());
+            if (tokens[0] === ',')
+                tokens[0].shift();
         }
     }
 };
 
-// TODO: these are actually not supported JSON-LD, just adding them for completeness
-N3Parser.prototype._quantification = function (result)
+N3Parser.prototype._quantification = function (tokens)
 {
-    var quantifier = result.tokens.shift();
+    var quantifier = tokens.shift();
     var symbols = [];
-    while (result.tokens[0] !== '.')
+    while (tokens[0] !== '.')
     {
-        symbols.push(result.tokens[0].shift());
-        if (result.tokens[0] === ',')
-            result.tokens[0].shift();
+        symbols.push(tokens[0].shift());
+        if (tokens[0] === ',')
+            tokens[0].shift();
     }
     var jsonld = {};
     jsonld[quantifier] = symbols;
     return {'@graph': [jsonld]};
 };
 
-N3Parser.prototype._simpleStatement = function (result)
+N3Parser.prototype._simpleStatement = function (tokens)
 {
-    var subject = this._subject(result);
-    var propertylist = this._propertylist(result);
+    var subject = this._subject(tokens);
+    var propertylist = this._propertylist(tokens);
     return {'@graph': [_.extend(subject, propertylist)]};
 };
 
-N3Parser.prototype._subject = function (result)
+N3Parser.prototype._subject = function (tokens)
 {
-    return { '@id': this._expression(result) };
+    return this._expression(tokens);
 };
 
-N3Parser.prototype._expression = function (result)
+N3Parser.prototype._expression = function (tokens)
 {
-    return this._pathitem(result);
-    // this._pathtail(result); // TODO: look into pathtail
+    var pathitem = this._pathitem(tokens); // x
+    pathitem = _.isString(pathitem) ? { '@id': pathitem} : pathitem;
+    // TODO: problem because there is a big difference between predicates and the rest?
+    // TODO: should check out what the parser does with this
+    if (tokens[0] === '!')
+    {
+        // x!p means [ is p of x ]
+        tokens.shift(); // '!'
+        var p = this._expression(tokens);
+        return this._combinePredicateObjects({'@reverse': p}, [pathitem]);
+    }
+    else if (tokens[0] === '^')
+    {
+        // x^p means [ p x ]
+        tokens.shift(); // '^'
+        var p = this._expression(tokens);
+        return this._combinePredicateObjects(p, [pathitem]);
+    }
+    return pathitem;
 };
 
-N3Parser.prototype._pathitem = function (result)
+N3Parser.prototype._pathitem = function (tokens)
 {
-    if (result.tokens[0] === '{')
-        return this._formulacontent(result);
-    else if (result.tokens[0] === '[')
-        return this._propertylist(result);
-    else if (result.tokens[0] === '(')
-        return this._pathlist(result);
+    if (tokens[0] === '{')
+    {
+        tokens.shift(); // {
+        var result = this._formulacontent(tokens);
+        tokens.shift(); // }
+        return result;
+    }
+    else if (tokens[0] === '[')
+    {
+        // TODO: also do shifting here for the other parts
+        tokens.shift(); // [
+        var result = this._propertylist(tokens);
+        tokens.shift(); // ]
+        return result;
+    }
+    else if (tokens[0] === '(')
+    {
+        tokens.shift(); // (
+        var result = this._pathlist(tokens);
+        tokens.shift(); // )
+        return result;
+    }
     else
-        return result.tokens.shift();
+        return tokens.shift();
 };
 
-N3Parser.prototype._pathlist = function (result)
+N3Parser.prototype._pathlist = function (tokens)
 {
     var list = [];
-    result.tokens.shift(); // '('
-    while (result.tokens[0] !== ')')
-        list.push(this._expression(result));
-    result.tokens.shift(); // ')'
+    while (tokens[0] !== ')')
+        list.push(this._expression(tokens));
     return {'@list': list};
 };
 
 // TODO: how do you do named graphs in N3?
-N3Parser.prototype._formulacontent = function (result)
+N3Parser.prototype._formulacontent = function (tokens)
 {
     var content = {};
-    result.tokens.shift(); // '{'
     var start = true;
-    while (result.tokens[0] !== '}')
+    while (tokens[0] !== '}')
     {
         if (!start)
-            result.tokens.shift(); // '.'
+            tokens.shift(); // '.'
         // difference with statements_optional: this one doesn't end with a dot
         // TODO: same problem as statementsOptional here
-        var statement = this._statement(result);
+        var statement = this._statement(tokens);
         if (content['@graph'] && statement['@graph'])
             statement['@graph'] = content['@graph'].concat(statement['@graph']);
         _.extend(content, statement);
         start = false;
     }
-    result.tokens.shift(); // '}'
     return content;
 };
 
-N3Parser.prototype._propertylist = function (result)
+N3Parser.prototype._propertylist = function (tokens)
 {
-    if (result.tokens[0] === '[')
-        result.tokens.shift();
     // TODO: handle special cases such as formulas as predicate
     // TODO: use @type for type predicates?
-    var predicate = this._predicate(result);
-    var objects = [this._object(result)];
-    while (result.tokens[0] === ',')
+    var predicate = this._predicate(tokens);
+
+    var objects = [this._object(tokens)];
+    while (tokens[0] === ',')
     {
-        result.tokens.shift();
-        objects.push(this._object(result));
+        tokens.shift();
+        objects.push(this._object(tokens));
     }
+    var jsonld = this._combinePredicateObjects(predicate, objects);
+    if (tokens[0] === ';')
+    {
+        tokens.shift();
+        _.extend(jsonld, this._propertylist(tokens));
+    }
+    return jsonld;
+};
+
+N3Parser.prototype._combinePredicateObjects = function (predicate, objects)
+{
+    // simple URIs get converted to { @id: URI}, this needs to be changed for predicates
+    // TODO: sort of ugly, maybe move the @id part to somewhere later? (might then give problems with subjects though
+    var keys = Object.keys(predicate);
+    if (keys.length === 1 && keys[0] === '@id')
+        predicate = predicate['@id'];
+
     var jsonld = {};
     if (predicate['@reverse'])
     {
         jsonld['@reverse'] = {};
         jsonld['@reverse'][predicate['@reverse']] = objects;
     }
+    else if (!_.isString(predicate))
+    {
+        // TODO: generate unique blank node id
+        var blank = 'TODO1';
+        // TODO: can we have a reverse problem here?
+        // TODO: this tells the final parser to move this part up a level?
+        jsonld['..'] = [_.extend({'@id': blank}, predicate)];
+        jsonld[blank] = objects;
+    }
     else
         jsonld[predicate] = objects;
-    if (result.tokens[0] === ';')
-    {
-        result.tokens.shift();
-        _.extend(jsonld, this._propertylist(result));
-    }
-    if (result.tokens[0] === ']')
-        result.tokens.shift();
     return jsonld;
 };
 
 // TODO: what to do with predicates with empty prefix?
-N3Parser.prototype._predicate = function (result)
+N3Parser.prototype._predicate = function (tokens)
 {
-    if (result.tokens[0] === '@has')
+    if (tokens[0] === '@has')
     {
-        result.tokens[0].shift(); // @has
-        return this._expression(result);
+        tokens[0].shift(); // @has
+        return this._expression(tokens);
     }
-    else if (result.tokens[0] === '@is')
+    else if (tokens[0] === '@is')
     {
-        result.tokens[0].shift(); // @is
-        var pred = this._expression(result);
-        result.tokens[0].shift(); // @of
+        tokens[0].shift(); // @is
+        var pred = this._expression(tokens);
+        tokens[0].shift(); // @of
         return {'@reverse': pred};
     }
-    else if (result.tokens === '@a')
+    else if (tokens === '@a')
     {
-        result.tokens[0].shift(); // @a
+        tokens[0].shift(); // @a
         return 'http://www.w3.org/1999/02/22-rdf-syntax-ns#';
     }
-    else if (result.tokens === '=')
+    else if (tokens === '=')
     {
-        result.tokens[0].shift(); // =
+        tokens[0].shift(); // =
         return 'http://www.w3.org/2002/07/owl#equivalentTo';
     }
-    else if (result.tokens === '=>')
+    else if (tokens === '=>')
     {
-        result.tokens[0].shift(); // =>
+        tokens[0].shift(); // =>
         return 'http://www.w3.org/2000/10/swap/log#implies';
     }
-    else if (result.tokens === '<=')
+    else if (tokens === '<=')
     {
-        result.tokens[0].shift(); // <=
+        tokens[0].shift(); // <=
         return {'@reverse': 'http://www.w3.org/2000/10/swap/log#implies'};
     }
     else
-        return this._expression(result);
+        return this._expression(tokens);
 };
 
-N3Parser.prototype._object = function (result)
+N3Parser.prototype._object = function (tokens)
 {
-    var object = this._expression(result);
-    return _.isString(object) ? { '@id': object} : object; // object can also be a graph/array/etc.
+    return this._expression(tokens);
 };
 
 var parser = new N3Parser();
-parser.parse(':Plato :says { :Socrates :is :mortal }.');
+// parser.parse(':Plato :says { :Socrates :is :mortal }.');
+parser.parse('[:A :b] :is :Socrates.');
