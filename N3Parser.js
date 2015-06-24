@@ -88,6 +88,36 @@ N3Parser.prototype._revertMatches = function (jsonld, invertedMap)
     return result;
 };
 
+N3Parser.prototype._extend = function (objectA, objectB)
+{
+    if (_.isString(objectA) && _.isString(objectB))
+        return [objectA, objectB];
+
+    if (_.isArray(objectA) !== _.isArray(objectB))
+    {
+        objectA = _.isArray(objectA) ? objectA : [objectA];
+        objectB = _.isArray(objectB) ? objectB : [objectB];
+    }
+
+    if (_.isArray(objectA) && _.isArray(objectB))
+        return objectA.concat(objectB);
+
+    // 2 objects
+    var result = {};
+    var keys = _.union(Object.keys(objectA), Object.keys(objectB));
+    for (var i = 0; i < keys.length; ++i)
+    {
+        var key = keys[i];
+        if (objectA[key] && objectB[key])
+            result[key] = this._extend(objectA[key], objectB[key]);
+        else if (objectA[key])
+            result[key] = objectA[key];
+        else if (objectB[key])
+            result[key] = objectB[key];
+    }
+    return result;
+};
+
 N3Parser.prototype._statementsOptional = function (tokens)
 {
     if (tokens.length === 0)
@@ -103,11 +133,8 @@ N3Parser.prototype._statementsOptional = function (tokens)
             throw "Error: expected '.' but got " + dot; // TODO: better error reporting would be nice
     }
 
-    // TODO: extend problem possible in deeper levels?
     var statements = this._statementsOptional(tokens);
-    if (statement['@graph'] && statements['@graph'])
-        statements['@graph'] = statement['@graph'].concat(statements['@graph']);
-    return _.extend(statement, statements);
+    return this._extend(statement, statements);
 };
 
 
@@ -178,7 +205,7 @@ N3Parser.prototype._simpleStatement = function (tokens)
 {
     var subject = this._subject(tokens);
     var propertylist = this._propertylist(tokens);
-    return {'@graph': [_.extend(subject, propertylist)]};
+    return {'@graph': [this._extend(subject, propertylist)]};
 };
 
 N3Parser.prototype._subject = function (tokens)
@@ -259,7 +286,7 @@ N3Parser.prototype._formulacontent = function (tokens)
         var statement = this._statement(tokens);
         if (content['@graph'] && statement['@graph'])
             statement['@graph'] = content['@graph'].concat(statement['@graph']);
-        _.extend(content, statement);
+        content = this._extend(content, statement);
         start = false;
     }
     return content;
@@ -267,8 +294,6 @@ N3Parser.prototype._formulacontent = function (tokens)
 
 N3Parser.prototype._propertylist = function (tokens)
 {
-    // TODO: handle special cases such as formulas as predicate
-    // TODO: use @type for type predicates?
     var predicate = this._predicate(tokens);
 
     var objects = [this._object(tokens)];
@@ -281,7 +306,7 @@ N3Parser.prototype._propertylist = function (tokens)
     if (tokens[0] === ';')
     {
         tokens.shift();
-        _.extend(jsonld, this._propertylist(tokens));
+        jsonld = this._extend(jsonld, this._propertylist(tokens));
     }
     return jsonld;
 };
@@ -306,7 +331,7 @@ N3Parser.prototype._combinePredicateObjects = function (predicate, objects)
         var blank = 'TODO1';
         // TODO: can we have a reverse problem here?
         // TODO: this tells the final parser to move this part up a level?
-        jsonld['..'] = [_.extend({'@id': blank}, predicate)];
+        jsonld['..'] = [this._extend({'@id': blank}, predicate)];
         jsonld[blank] = objects;
     }
     else
@@ -332,7 +357,7 @@ N3Parser.prototype._predicate = function (tokens)
     else if (tokens === '@a')
     {
         tokens[0].shift(); // @a
-        return 'http://www.w3.org/1999/02/22-rdf-syntax-ns#';
+        return '@type';
     }
     else if (tokens === '=')
     {
@@ -359,5 +384,5 @@ N3Parser.prototype._object = function (tokens)
 };
 
 var parser = new N3Parser();
-// parser.parse(':Plato :says { :Socrates :is :mortal }.');
-parser.parse('[:A :b] :is :Socrates.');
+parser.parse(':Plato :says { :Socrates :is :mortal }.');
+//parser.parse('[:A :b] :is :Socrates.');
