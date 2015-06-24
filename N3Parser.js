@@ -133,8 +133,7 @@ N3Parser.prototype._statementsOptional = function (tokens)
             throw "Error: expected '.' but got " + dot; // TODO: better error reporting would be nice
     }
 
-    var statements = this._statementsOptional(tokens);
-    return this._extend(statement, statements);
+    return this._extend(statement, this._statementsOptional(tokens));
 };
 
 
@@ -247,7 +246,6 @@ N3Parser.prototype._pathitem = function (tokens)
     }
     else if (tokens[0] === '[')
     {
-        // TODO: also do shifting here for the other parts
         tokens.shift(); // [
         var result = this._propertylist(tokens);
         tokens.shift(); // ]
@@ -282,11 +280,7 @@ N3Parser.prototype._formulacontent = function (tokens)
         if (!start)
             tokens.shift(); // '.'
         // difference with statements_optional: this one doesn't end with a dot
-        // TODO: same problem as statementsOptional here
-        var statement = this._statement(tokens);
-        if (content['@graph'] && statement['@graph'])
-            statement['@graph'] = content['@graph'].concat(statement['@graph']);
-        content = this._extend(content, statement);
+        content = this._extend(content, this._statement(tokens));
         start = false;
     }
     return content;
