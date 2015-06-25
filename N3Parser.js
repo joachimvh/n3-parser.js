@@ -9,6 +9,7 @@ function N3Parser ()
 
 }
 
+// TODO: 32 bit unicode
 N3Parser._PN_CHARS_BASE = /[A-Z_a-z\u00c0-\u00d6\u00d8-\u00f6\u00f8-\u02ff\u0370-\u037d\u037f-\u1fff\u200c-\u200d\u2070-\u218f\u2c00-\u2fef\u3001-\ud7ff\uf900-\ufdcf\ufdf0-\ufffd]/g;
 N3Parser._PN_CHARS_U = new RegExp('(?:' + N3Parser._PN_CHARS_BASE.source + '|_)');
 N3Parser._PN_CHARS = new RegExp('(?:' + N3Parser._PN_CHARS_U.source + '|' + /[-0-9\u00b7\u0300-\u036f\u203f-\u2040]/.source + ')');
@@ -287,12 +288,12 @@ N3Parser.prototype._declaration = function (tokens)
 {
     var declaration = tokens.shift(); // TODO: handle incorrect array lengths
 
-    if (declaration === '@base' || declaration === 'BASE')
+    if (declaration === '@base' || declaration.toUpperCase() === 'BASE')
     {
         var uri = results.tokens.shift();
         return { '@context': { '@base': uri}};
     }
-    else if (declaration === '@prefix' || declaration === 'PREFIX')
+    else if (declaration === '@prefix' || declaration.toUpperCase() === 'PREFIX')
     {
         var prefix = tokens.shift();
         var uri = tokens.shift();
@@ -518,5 +519,5 @@ N3Parser.prototype._object = function (tokens)
 var parser = new N3Parser();
 //parser.parse(':Plato :says { :Socrates :is :mortal }.');
 //parser.parse(':Plato [:A :b] :Socrates.');
-parser.parse(':a :b 5.E3:a :b :c.');
+parser.parse(':a :b 5.E3.E3:a :b :c.');
 //parser.parse('@prefix gr: <http://purl.org/goodrelations/v1#> . <http://www.acme.com/#store> a gr:Location; gr:hasOpeningHoursSpecification [ a gr:OpeningHoursSpecification; gr:opens "08:00:00"; gr:closes "20:00:00"; gr:hasOpeningHoursDayOfWeek gr:Friday, gr:Monday, gr:Thursday, gr:Tuesday, gr:Wednesday ]; gr:name "Hepp\'s Happy Burger Restaurant" .');
