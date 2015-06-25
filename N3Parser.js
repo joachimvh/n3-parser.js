@@ -45,7 +45,16 @@ N3Parser.prototype.parse = function (n3String)
     var tokens = n3String.split(/\s+|([;.,{}[\]()])|(<?=>?)/).filter(Boolean); // splits and removes empty elements
     var jsonld = this._statementsOptional(tokens);
     this._updatePathNodes(jsonld); // changes in place
-    jsonld = this._updateLiterals(jsonld, literalKeys);
+
+    // default graph is not always necessary to indicate
+    if (jsonld['@graph'] && jsonld['@graph'].length === 1)
+    {
+        var child = jsonld['@graph'][0];
+        delete jsonld['@graph'];
+        jsonld = this._extend(jsonld, child);
+    }
+
+    jsonld = this._simplification(jsonld, literalKeys);
     jsonld = this._revertMatches(jsonld, valueMap);
     console.log(JSON.stringify(jsonld, null, 4));
 
@@ -158,20 +167,37 @@ N3Parser.prototype._updatePathNodes = function (jsonld)
     return result;
 };
 
-N3Parser.prototype._updateLiterals = function (jsonld, literalKeys)
+N3Parser.prototype._simplification = function (jsonld, literalKeys)
 {
 
     if (_.isString(jsonld))
         return jsonld;
     if (_.isArray(jsonld))
-        return jsonld.map(function (thingy) { return this._updateLiterals(thingy, literalKeys) }, this);
+        return jsonld.map(function (thingy) { return this._simplification(thingy, literalKeys) }, this);
 
     if (jsonld['@id'] && Object.keys(jsonld).length === 1 && _.contains(literalKeys, jsonld['@id']))
         return jsonld['@id'];
 
     var result = {};
     for (var v in jsonld)
-        result[v] = this._updateLiterals(jsonld[v], literalKeys);
+    {
+        result[v] = this._simplification(jsonld[v], literalKeys);
+        if (_.isArray(result[v]) && result[v].length === 1)
+            result[v] = result[v][0];
+    }
+
+    if (result['@type'])
+    {
+        if (result['@type']['@id'] && Object.keys(result['@type']).length === 1)
+            result['@type'] = result['@type']['@id'];
+        else if (_.isArray(result['@type']))
+            result['@type'] = result['@type'].map(function (type)
+            {
+                if (type['@id'] && Object.keys(type).length === 1)
+                  return type['@id'];
+                return type;
+            });
+    }
 
     return result;
 };
@@ -481,5 +507,5 @@ N3Parser.prototype._object = function (tokens)
 var parser = new N3Parser();
 //parser.parse(':Plato :says { :Socrates :is :mortal }.');
 //parser.parse(':Plato [:A :b] :Socrates.');
-parser.parse(':Plato :is "a", "b"@en-gb, "c"^^xsd:integer.');
-//parser.parse('@prefix gr: <http://purl.org/goodrelations/v1#> . <http://www.acme.com/#store> a gr:Location; gr:hasOpeningHoursSpecification [ a gr:OpeningHoursSpecification; gr:opens "08:00:00"; gr:closes "20:00:00"; gr:hasOpeningHoursDayOfWeek gr:Friday, gr:Monday, gr:Thursday, gr:Tuesday, gr:Wednesday ]; gr:name "Hepp\'s Happy Burger Restaurant" .');
+//parser.parse(':Plato :is "a", "b"@en-gb, "c"^^xsd:integer.');
+parser.parse('@prefix gr: <http://purl.org/goodrelations/v1#> . <http://www.acme.com/#store> a gr:Location; gr:hasOpeningHoursSpecification [ a gr:OpeningHoursSpecification; gr:opens "08:00:00"; gr:closes "20:00:00"; gr:hasOpeningHoursDayOfWeek gr:Friday, gr:Monday, gr:Thursday, gr:Tuesday, gr:Wednesday ]; gr:name "Hepp\'s Happy Burger Restaurant" .');
