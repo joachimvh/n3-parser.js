@@ -21,7 +21,7 @@ N3Parser._postfix = new RegExp(
     '(?:(?:' + N3Parser._PN_CHARS.source + '|[.:]|' + N3Parser._PLX.source + ')*(?:' + N3Parser._PN_CHARS.source + '|[:]|' + N3Parser._PLX.source + '))?'
 );
 N3Parser._prefixIRI = new RegExp(
-    /(?![^[{(.\s])/.source + '(?:' + N3Parser._prefix.source + ')?:' + N3Parser._postfix.source + /(?![^\s.})\]])/.source, 'g'
+    /(?:[[{(.\s]|^)/.source + '(?:' + N3Parser._prefix.source + ')?:' + N3Parser._postfix.source + /(?![^\s.})\]])/.source, 'g'
 );
 N3Parser._iriRegex = /<[^>]*>/g;
 N3Parser._stringRegex = /("|')(\1\1)?(?:[^]*?[^\\])??(?:\\\\)*\2\1/g;
@@ -33,7 +33,7 @@ N3Parser._literalRegex = new RegExp(
     N3Parser._stringRegex.source +
     '((' + N3Parser._datatypeRegex.source + ')|(' + N3Parser._langRegex.source + '))?', 'g'
 );
-N3Parser._numericalRegex = /(?![^[{(.\s])[-+]?(?:(?:(?:(?:[0-9]+\.?[0-9]*)|(?:\.[0-9]+))[eE][-+]?[0-9]+)|(?:[0-9]*(\.[0-9]+))|(?:[0-9]+))(?![^\s.})\]])/g;
+N3Parser._numericalRegex = /(?:[[{(.\s]|^)[-+]?(?:(?:(?:(?:[0-9]+\.?[0-9]*)|(?:\.[0-9]+))[eE][-+]?[0-9]+)|(?:[0-9]*(\.[0-9]+))|(?:[0-9]+))(?![^\s.})\]])/g;
 
 N3Parser.prototype.parse = function (n3String)
 {
@@ -77,6 +77,16 @@ N3Parser.prototype._replaceMatches = function (string, regex, map, valueMap, cal
         match = matches[i];
 
         var matchString = string.substr(match.idx, match.length);
+
+        // need to do check of first character since javascript doesn't have lookbehind regexes
+        var pre = /^[[{(.\s]/;
+        if (pre.exec(matchString))
+        {
+            matchString = matchString.substring(1);
+            match.idx++;
+            match.length--;
+        }
+
         if (callback)
             callback(matchString);
         if (!map[matchString])
@@ -117,7 +127,6 @@ N3Parser.prototype._replaceStringLiteral = function (literal)
         return { '@value': str, '@language': lang};
     return str;
 };
-
 
 N3Parser.prototype._replaceIRI = function (iri)
 {
@@ -504,9 +513,10 @@ N3Parser.prototype._object = function (tokens)
 {
     return this._expression(tokens);
 };
-
+// :a :b :c.a:a :b :c.
+// :a :b :5.E3:a :b :c.
 var parser = new N3Parser();
 //parser.parse(':Plato :says { :Socrates :is :mortal }.');
 //parser.parse(':Plato [:A :b] :Socrates.');
-parser.parse(':a :b :5.E3:a :b :c.');
+parser.parse(':a :b 5.E3:a :b :c.');
 //parser.parse('@prefix gr: <http://purl.org/goodrelations/v1#> . <http://www.acme.com/#store> a gr:Location; gr:hasOpeningHoursSpecification [ a gr:OpeningHoursSpecification; gr:opens "08:00:00"; gr:closes "20:00:00"; gr:hasOpeningHoursDayOfWeek gr:Friday, gr:Monday, gr:Thursday, gr:Tuesday, gr:Wednesday ]; gr:name "Hepp\'s Happy Burger Restaurant" .');
