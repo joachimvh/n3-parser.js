@@ -14,7 +14,7 @@ function N3Parser ()
 N3Parser._prefixFirst = /[A-Z_a-z\u00c0-\u00d6\u00d8-\u00f6\u00f8-\u02ff\u0370-\u037d\u037f-\u1fff\u200c-\u200d\u2070-\u218f\u2c00-\u2fef\u3001-\ud7ff\uf900-\ufdcf\ufdf0-\ufffd]/g;
 N3Parser._prefixRest = new RegExp('(?:' + N3Parser._prefixFirst.source + '|' + /[-_0-9\u00b7\u0300-\u036f\u203f-\u2040]/.source + ')');
 N3Parser._prefix = new RegExp(
-    '(' + N3Parser._prefixFirst.source + '((' + N3Parser._prefixRest.source + '|\\.)*' + N3Parser._prefixRest.source + ')?)?', 'g'
+    '(?:' + N3Parser._prefixFirst.source + '(?:(?:' + N3Parser._prefixRest.source + '|\\.)*' + N3Parser._prefixRest.source + ')?)?', 'g'
 );
 N3Parser._postfix = /[a-zA-Z0-9]+/g; // TODO: not correct yet
 N3Parser._prefixIRI = new RegExp(
@@ -30,31 +30,33 @@ N3Parser._literalRegex = new RegExp(
     N3Parser._stringRegex.source +
     '((' + N3Parser._datatypeRegex.source + ')|(' + N3Parser._langRegex.source + '))?', 'g'
 );
-N3Parser._numericalRegex = /[-+]?[0-9]+(\\.[0-9]*)?([eE][-+]?[0-9]+)?/g;
+N3Parser._numericalRegex = /[-+]?[0-9]+(\\.[0-9]*)?([eE][-+]?[0-9]+)?/g; // TODO: pretty sure there will be problems with the dots
 
 N3Parser.prototype.parse = function (n3String)
 {
     var replacementMap = {idx: 0};
-    n3String = this._replaceMatches(n3String, N3Parser._literalRegex, replacementMap);
-    n3String = this._replaceMatches(n3String, N3Parser._iriRegex, replacementMap);
-    n3String = this._replaceMatches(n3String, N3Parser._prefixIRI, replacementMap);
+    var valueMap = {};
+    n3String = this._replaceMatches(n3String, N3Parser._literalRegex, replacementMap, valueMap, this._replaceStringLiteral);
+    var literalKeys = Object.keys(valueMap);
+    n3String = this._replaceMatches(n3String, N3Parser._iriRegex, replacementMap, valueMap, this._replaceIRI);
+    n3String = this._replaceMatches(n3String, N3Parser._prefixIRI, replacementMap, valueMap, this._replaceIRI);
+    console.log(n3String);
 
     var tokens = n3String.split(/\s+|([;.,{}[\]()])|(<?=>?)/).filter(Boolean); // splits and removes empty elements
     var jsonld = this._statementsOptional(tokens);
     this._updatePathNodes(jsonld); // changes in place
-    jsonld = this._revertMatches(jsonld, _.invert(replacementMap));
+    jsonld = this._updateLiterals(jsonld, literalKeys);
+    jsonld = this._revertMatches(jsonld, valueMap);
     console.log(JSON.stringify(jsonld, null, 4));
 
-    // TODO: update literals that are currently represented as URIs
     // TODO: simplification (replace arrays with 1 element)
-    // TODO: string literals get double ticks in the JSON-LD output
-    // TODO: handle datatypes/languages
 };
 
-N3Parser.prototype._replaceMatches = function (string, regex, map)
+N3Parser.prototype._replaceMatches = function (string, regex, map, valueMap, callback)
 {
     var matches = [];
     var match;
+    regex.lastIndex = 0;
     while (match = regex.exec(string))
         matches.push({idx:match.index, length:match[0].length});
 
@@ -64,8 +66,13 @@ N3Parser.prototype._replaceMatches = function (string, regex, map)
         match = matches[i];
 
         var matchString = string.substr(match.idx, match.length);
+        if (callback)
+            callback(matchString);
         if (!map[matchString])
+        {
             map[matchString] = '#' + ++map.idx;
+            valueMap[map[matchString]] = callback ? callback(matchString) : matchString;
+        }
 
         stringParts.push(string.substr(match.idx + match.length));
         stringParts.push(map[matchString]);
@@ -75,6 +82,37 @@ N3Parser.prototype._replaceMatches = function (string, regex, map)
     stringParts.reverse();
 
     return stringParts.join('');
+};
+
+N3Parser.prototype._replaceStringLiteral = function (literal)
+{
+    N3Parser._stringRegex.lastIndex = 0;
+    N3Parser._datatypeRegex.lastIndex = 0;
+    N3Parser._langRegex.lastIndex = 0;
+
+    var str = N3Parser._stringRegex.exec(literal);
+    var type = N3Parser._datatypeRegex.exec(literal);
+    var lang = N3Parser._langRegex.exec(literal);
+
+    str = str[0].substring(1, str[0].length-1);
+    type = type && type[0].substring(2);
+    if (type && type[0] === '<')
+        type = type.substring(1, type.length-1);
+    lang = lang && lang[0].substring(1);
+
+    if (type)
+        return { '@value': str, '@type': type};
+    if (lang)
+        return { '@value': str, '@language': lang};
+    return str;
+};
+
+
+N3Parser.prototype._replaceIRI = function (iri)
+{
+    if (iri[0] === '<')
+        iri = iri.substring(1, iri.length-1);
+    return iri;
 };
 
 N3Parser.prototype._revertMatches = function (jsonld, invertedMap)
@@ -116,6 +154,24 @@ N3Parser.prototype._updatePathNodes = function (jsonld)
 
     var result = jsonld['..'] || [];
     delete jsonld['..'];
+
+    return result;
+};
+
+N3Parser.prototype._updateLiterals = function (jsonld, literalKeys)
+{
+
+    if (_.isString(jsonld))
+        return jsonld;
+    if (_.isArray(jsonld))
+        return jsonld.map(function (thingy) { return this._updateLiterals(thingy, literalKeys) }, this);
+
+    if (jsonld['@id'] && Object.keys(jsonld).length === 1 && _.contains(literalKeys, jsonld['@id']))
+        return jsonld['@id'];
+
+    var result = {};
+    for (var v in jsonld)
+        result[v] = this._updateLiterals(jsonld[v], literalKeys);
 
     return result;
 };
@@ -424,5 +480,6 @@ N3Parser.prototype._object = function (tokens)
 
 var parser = new N3Parser();
 //parser.parse(':Plato :says { :Socrates :is :mortal }.');
-parser.parse(':Plato [:A :b] :Socrates.');
+//parser.parse(':Plato [:A :b] :Socrates.');
+parser.parse(':Plato :is "a", "b"@en-gb, "c"^^xsd:integer.');
 //parser.parse('@prefix gr: <http://purl.org/goodrelations/v1#> . <http://www.acme.com/#store> a gr:Location; gr:hasOpeningHoursSpecification [ a gr:OpeningHoursSpecification; gr:opens "08:00:00"; gr:closes "20:00:00"; gr:hasOpeningHoursDayOfWeek gr:Friday, gr:Monday, gr:Thursday, gr:Tuesday, gr:Wednesday ]; gr:name "Hepp\'s Happy Burger Restaurant" .');
