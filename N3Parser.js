@@ -9,16 +9,19 @@ function N3Parser ()
 
 }
 
-// TODO: should extend this to correct characters
-// TODO: check this for more annoying examples
-N3Parser._prefixFirst = /[A-Z_a-z\u00c0-\u00d6\u00d8-\u00f6\u00f8-\u02ff\u0370-\u037d\u037f-\u1fff\u200c-\u200d\u2070-\u218f\u2c00-\u2fef\u3001-\ud7ff\uf900-\ufdcf\ufdf0-\ufffd]/g;
-N3Parser._prefixRest = new RegExp('(?:' + N3Parser._prefixFirst.source + '|' + /[-_0-9\u00b7\u0300-\u036f\u203f-\u2040]/.source + ')');
+N3Parser._PN_CHARS_BASE = /[A-Z_a-z\u00c0-\u00d6\u00d8-\u00f6\u00f8-\u02ff\u0370-\u037d\u037f-\u1fff\u200c-\u200d\u2070-\u218f\u2c00-\u2fef\u3001-\ud7ff\uf900-\ufdcf\ufdf0-\ufffd]/g;
+N3Parser._PN_CHARS_U = new RegExp('(?:' + N3Parser._PN_CHARS_BASE.source + '|_)');
+N3Parser._PN_CHARS = new RegExp('(?:' + N3Parser._PN_CHARS_U.source + '|' + /[-0-9\u00b7\u0300-\u036f\u203f-\u2040]/.source + ')');
+N3Parser._PLX = /(?:%[0-9a-fA-F]{2})|(?:\\[-_~.!$&'()*+,;=/?#@%])/g;
 N3Parser._prefix = new RegExp(
-    '(?:' + N3Parser._prefixFirst.source + '(?:(?:' + N3Parser._prefixRest.source + '|\\.)*' + N3Parser._prefixRest.source + ')?)?', 'g'
+    N3Parser._PN_CHARS_BASE.source + '(?:(?:' + N3Parser._PN_CHARS.source + '|\.)*' + N3Parser._PN_CHARS.source + ')?', 'g'
 );
-N3Parser._postfix = /[a-zA-Z0-9]+/g; // TODO: not correct yet
+N3Parser._postfix = new RegExp(
+    '(?:' + N3Parser._PN_CHARS_U.source + '|[:0-9]|' + N3Parser._PLX.source + ')' +
+    '(?:(?:' + N3Parser._PN_CHARS.source + '|[.:]|' + N3Parser._PLX.source + ')*(?:' + N3Parser._PN_CHARS.source + '|[:]|' + N3Parser._PLX.source + '))?'
+);
 N3Parser._prefixIRI = new RegExp(
-    N3Parser._prefix.source + ':' + N3Parser._postfix.source, 'g'
+    '(?:' + N3Parser._prefix.source + ')?:' + N3Parser._postfix.source, 'g'
 );
 N3Parser._iriRegex = /<[^>]*>/g;
 N3Parser._stringRegex = /("|')(\1\1)?(?:[^]*?[^\\])??(?:\\\\)*\2\1/g;
@@ -30,7 +33,7 @@ N3Parser._literalRegex = new RegExp(
     N3Parser._stringRegex.source +
     '((' + N3Parser._datatypeRegex.source + ')|(' + N3Parser._langRegex.source + '))?', 'g'
 );
-N3Parser._numericalRegex = /[-+]?[0-9]+(\\.[0-9]*)?([eE][-+]?[0-9]+)?/g; // TODO: pretty sure there will be problems with the dots
+N3Parser._numericalRegex = /[-+]?(?:(?:(?:(?:[0-9]+\.?[0-9]*)|(?:\.[0-9]+))[eE][-+]?[0-9]+)|(?:[0-9]*(\.[0-9]+))|(?:[0-9]+))(?=\s*[.})])/g;
 
 N3Parser.prototype.parse = function (n3String)
 {
@@ -57,8 +60,6 @@ N3Parser.prototype.parse = function (n3String)
     jsonld = this._simplification(jsonld, literalKeys);
     jsonld = this._revertMatches(jsonld, valueMap);
     console.log(JSON.stringify(jsonld, null, 4));
-
-    // TODO: simplification (replace arrays with 1 element)
 };
 
 N3Parser.prototype._replaceMatches = function (string, regex, map, valueMap, callback)
@@ -84,7 +85,7 @@ N3Parser.prototype._replaceMatches = function (string, regex, map, valueMap, cal
         }
 
         stringParts.push(string.substr(match.idx + match.length));
-        stringParts.push(map[matchString]);
+        stringParts.push(' ' + map[matchString] + ' '); // extra whitespace helps in parsing
         string = string.substring(0, match.idx);
     }
     stringParts.push(string);
@@ -431,7 +432,6 @@ N3Parser.prototype._propertylist = function (tokens)
 N3Parser.prototype._combinePredicateObjects = function (predicate, objects)
 {
     // simple URIs get converted to { @id: URI}, this needs to be changed for predicates
-    // TODO: sort of ugly, maybe move the @id part to somewhere later? (might then give problems with subjects though
     if (!_.isString(predicate))
     {
         var keys = Object.keys(predicate);
@@ -440,6 +440,7 @@ N3Parser.prototype._combinePredicateObjects = function (predicate, objects)
     }
 
     var jsonld = {};
+    // TODO: what if reversed predicate is an object
     if (predicate['@reverse'])
     {
         jsonld['@reverse'] = {};
@@ -450,7 +451,7 @@ N3Parser.prototype._combinePredicateObjects = function (predicate, objects)
         // TODO: generate unique blank node id
         var blank = 'TODO1';
         // TODO: can we have a reverse problem here?
-        // TODO: this tells the final parser to move this part up a level?
+        // this tells the final parser to move this part up a level?
         jsonld['..'] = [this._extend({'@id': blank}, predicate)];
         jsonld[blank] = objects;
     }
@@ -474,7 +475,6 @@ N3Parser.prototype._predicate = function (tokens)
         tokens.shift(); // @of
         return {'@reverse': pred};
     }
-    // TODO: @type doesn't require an @id for the predicate?
     else if (tokens[0] === '@a' || tokens[0] === 'a')
     {
         tokens.shift(); // @a
@@ -507,5 +507,5 @@ N3Parser.prototype._object = function (tokens)
 var parser = new N3Parser();
 //parser.parse(':Plato :says { :Socrates :is :mortal }.');
 //parser.parse(':Plato [:A :b] :Socrates.');
-//parser.parse(':Plato :is "a", "b"@en-gb, "c"^^xsd:integer.');
-parser.parse('@prefix gr: <http://purl.org/goodrelations/v1#> . <http://www.acme.com/#store> a gr:Location; gr:hasOpeningHoursSpecification [ a gr:OpeningHoursSpecification; gr:opens "08:00:00"; gr:closes "20:00:00"; gr:hasOpeningHoursDayOfWeek gr:Friday, gr:Monday, gr:Thursday, gr:Tuesday, gr:Wednesday ]; gr:name "Hepp\'s Happy Burger Restaurant" .');
+parser.parse(':a :b :c.a. b:a :b :c.');
+//parser.parse('@prefix gr: <http://purl.org/goodrelations/v1#> . <http://www.acme.com/#store> a gr:Location; gr:hasOpeningHoursSpecification [ a gr:OpeningHoursSpecification; gr:opens "08:00:00"; gr:closes "20:00:00"; gr:hasOpeningHoursDayOfWeek gr:Friday, gr:Monday, gr:Thursday, gr:Tuesday, gr:Wednesday ]; gr:name "Hepp\'s Happy Burger Restaurant" .');
