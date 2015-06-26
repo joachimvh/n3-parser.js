@@ -43,14 +43,10 @@ N3Parser.prototype.parse = function (n3String)
     var replacementMap = {idx: 0};
     var valueMap = {};
     n3String = this._replaceMatches(n3String, N3Parser._literalRegex, replacementMap, valueMap, this._replaceStringLiteral);
-    console.log('strings');
     n3String = this._replaceMatches(n3String, N3Parser._numericalRegex, replacementMap, valueMap, parseFloat);
-    console.log('numerics');
     var literalKeys = Object.keys(valueMap);
     n3String = this._replaceMatches(n3String, N3Parser._iriRegex, replacementMap, valueMap, this._replaceIRI);
-    console.log('iris');
     n3String = this._replaceMatches(n3String, N3Parser._prefixIRI, replacementMap, valueMap, this._replaceIRI);
-    console.log('prefix iris');
     console.log(n3String);
 
     var tokens = n3String.split(/\s+|([;.,{}[\]()])|(<?=>?)/).filter(Boolean); // splits and removes empty elements
@@ -415,20 +411,21 @@ N3Parser.prototype._pathlist = function (tokens)
 N3Parser.prototype._formulacontent = function (tokens)
 {
     var content = {};
-    var start = true;
     while (tokens[0] !== '}')
     {
-        if (!start)
-            tokens.shift(); // '.'
-        // difference with statements_optional: this one doesn't end with a dot
+        // difference with statements_optional: this one doesn't necessarily end with a dot
         content = this._extend(content, this._statement(tokens));
-        start = false;
+        if (tokens[0] === '.') // note that the dot should always be here except for the last statement
+            tokens.shift();
     }
     return content;
 };
 
 N3Parser.prototype._propertylist = function (tokens)
 {
+    if (tokens.length === 0 || tokens[0] === ']' || tokens[0] === '.')
+        return {};
+
     var predicate = this._predicate(tokens);
 
     var objects = [this._object(tokens)];
@@ -527,3 +524,7 @@ var parser = new N3Parser();
 //parser.parse(':Plato [:A :b] :Socrates.');
 //parser.parse(':a :b 5.E3.a:a :b :c.');
 //parser.parse('@prefix gr: <http://purl.org/goodrelations/v1#> . <http://www.acme.com/#store> a gr:Location; gr:hasOpeningHoursSpecification [ a gr:OpeningHoursSpecification; gr:opens "08:00:00"; gr:closes "20:00:00"; gr:hasOpeningHoursDayOfWeek gr:Friday, gr:Monday, gr:Thursday, gr:Tuesday, gr:Wednesday ]; gr:name "Hepp\'s Happy Burger Restaurant" .');
+
+var fs = require('fs');
+var data = fs.readFileSync('n3/secondUseCase/proof.n3', 'utf8');
+parser.parse(data);
