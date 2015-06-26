@@ -14,15 +14,16 @@ N3Parser._PN_CHARS_BASE = /[A-Z_a-z\u00c0-\u00d6\u00d8-\u00f6\u00f8-\u02ff\u0370
 N3Parser._PN_CHARS_U = new RegExp('(?:' + N3Parser._PN_CHARS_BASE.source + '|_)');
 N3Parser._PN_CHARS = new RegExp('(?:' + N3Parser._PN_CHARS_U.source + '|' + /[-0-9\u00b7\u0300-\u036f\u203f-\u2040]/.source + ')');
 N3Parser._PLX = /(?:%[0-9a-fA-F]{2})|(?:\\[-_~.!$&'()*+,;=/?#@%])/g;
+// TODO: using _U instead of _BASE to also match blank nodes
 N3Parser._prefix = new RegExp(
-    N3Parser._PN_CHARS_BASE.source + '(?:(?:' + N3Parser._PN_CHARS.source + '|\.)*' + N3Parser._PN_CHARS.source + ')?', 'g'
+    N3Parser._PN_CHARS_U.source + '(?:(?:' + N3Parser._PN_CHARS.source + '|\\.)*' + N3Parser._PN_CHARS.source + ')?', 'g'
 );
 N3Parser._postfix = new RegExp(
     '(?:' + N3Parser._PN_CHARS_U.source + '|[:0-9]|' + N3Parser._PLX.source + ')' +
-    '(?:(?:' + N3Parser._PN_CHARS.source + '|[.:]|' + N3Parser._PLX.source + ')*(?:' + N3Parser._PN_CHARS.source + '|[:]|' + N3Parser._PLX.source + '))?'
+    '(?:(?:' + N3Parser._PN_CHARS.source + '|[.:]|' + N3Parser._PLX.source + ')*(?:' + N3Parser._PN_CHARS.source + '|:|' + N3Parser._PLX.source + '))?'
 );
 N3Parser._prefixIRI = new RegExp(
-    /(?:[[{(.\s]|^)/.source + '(?:' + N3Parser._prefix.source + ')?:' + N3Parser._postfix.source + /(?![^\s.})\]])/.source, 'g'
+    /(?:[[{(.\s,;]|^)/.source + '(?:' + N3Parser._prefix.source + ')?:' + N3Parser._postfix.source + /(?![^\s.})\],;])/.source, 'g'
 );
 N3Parser._iriRegex = /<[^>]*>/g;
 N3Parser._stringRegex = /("|')(\1\1)?(?:[^]*?[^\\])??(?:\\\\)*\2\1/g;
@@ -34,17 +35,22 @@ N3Parser._literalRegex = new RegExp(
     N3Parser._stringRegex.source +
     '((' + N3Parser._datatypeRegex.source + ')|(' + N3Parser._langRegex.source + '))?', 'g'
 );
-N3Parser._numericalRegex = /(?:[[{(.\s]|^)[-+]?(?:(?:(?:(?:[0-9]+\.?[0-9]*)|(?:\.[0-9]+))[eE][-+]?[0-9]+)|(?:[0-9]*(\.[0-9]+))|(?:[0-9]+))(?![^\s.})\]])/g;
+N3Parser._numericalRegex = /(?:[[{(.\s]|^)[-+]?(?:(?:(?:(?:[0-9]+\.?[0-9]*)|(?:\.[0-9]+))[eE][-+]?[0-9]+)|(?:[0-9]*(\.[0-9]+))|(?:[0-9]+))(?![^\s.})\],;])/g;
 
+// TODO: can't handle comments yet
 N3Parser.prototype.parse = function (n3String)
 {
     var replacementMap = {idx: 0};
     var valueMap = {};
     n3String = this._replaceMatches(n3String, N3Parser._literalRegex, replacementMap, valueMap, this._replaceStringLiteral);
+    console.log('strings');
     n3String = this._replaceMatches(n3String, N3Parser._numericalRegex, replacementMap, valueMap, parseFloat);
+    console.log('numerics');
     var literalKeys = Object.keys(valueMap);
     n3String = this._replaceMatches(n3String, N3Parser._iriRegex, replacementMap, valueMap, this._replaceIRI);
+    console.log('iris');
     n3String = this._replaceMatches(n3String, N3Parser._prefixIRI, replacementMap, valueMap, this._replaceIRI);
+    console.log('prefix iris');
     console.log(n3String);
 
     var tokens = n3String.split(/\s+|([;.,{}[\]()])|(<?=>?)/).filter(Boolean); // splits and removes empty elements
@@ -519,5 +525,5 @@ N3Parser.prototype._object = function (tokens)
 var parser = new N3Parser();
 //parser.parse(':Plato :says { :Socrates :is :mortal }.');
 //parser.parse(':Plato [:A :b] :Socrates.');
-parser.parse(':a :b 5.E3.E3:a :b :c.');
+//parser.parse(':a :b 5.E3.a:a :b :c.');
 //parser.parse('@prefix gr: <http://purl.org/goodrelations/v1#> . <http://www.acme.com/#store> a gr:Location; gr:hasOpeningHoursSpecification [ a gr:OpeningHoursSpecification; gr:opens "08:00:00"; gr:closes "20:00:00"; gr:hasOpeningHoursDayOfWeek gr:Friday, gr:Monday, gr:Thursday, gr:Tuesday, gr:Wednesday ]; gr:name "Hepp\'s Happy Burger Restaurant" .');
