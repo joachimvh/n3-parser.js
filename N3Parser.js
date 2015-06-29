@@ -203,13 +203,33 @@ N3Parser.prototype._updatePathNodes = function (jsonld, parent)
     return parentChanged;
 };
 
-N3Parser.prototype._simplification = function (jsonld, literalKeys)
+N3Parser.prototype._simplification = function (jsonld, literalKeys, orderedList)
 {
 
     if (_.isString(jsonld))
         return jsonld;
     if (_.isArray(jsonld))
-        return jsonld.map(function (thingy) { return this._simplification(thingy, literalKeys) }, this);
+    {
+        var simplified = jsonld.map(function (thingy) { return this._simplification(thingy, literalKeys) }, this);
+        // Don't merge items in ordered lists! Different semantics.
+        if (!orderedList)
+        {
+            // merge objects with same @id
+            var idMap = {};
+            var rest = [];
+            for (var i = 0; i < simplified.length; ++i)
+            {
+                var obj = simplified[i];
+                // TODO: can we have identical non-string @ids?
+                if (obj['@id'] && _.isString(obj['@id']))
+                    idMap[obj['@id']] = _.extend(idMap[obj['@id']] || {}, obj);
+                else
+                    rest.push(obj);
+            }
+            simplified = _.values(idMap).concat(rest);
+        }
+        return simplified;
+    }
 
     if (jsonld['@id'] && Object.keys(jsonld).length === 1 && _.contains(literalKeys, jsonld['@id']))
         return jsonld['@id'];
@@ -217,7 +237,7 @@ N3Parser.prototype._simplification = function (jsonld, literalKeys)
     var result = {};
     for (var v in jsonld)
     {
-        result[v] = this._simplification(jsonld[v], literalKeys);
+        result[v] = this._simplification(jsonld[v], literalKeys, v === '@list');
         if (_.isArray(result[v]) && result[v].length === 1)
             result[v] = result[v][0];
     }
@@ -537,10 +557,10 @@ N3Parser.prototype._object = function (tokens)
 // :a :b :5.E3:a :b :c.
 var parser = new N3Parser();
 //parser.parse(':Plato :says { :Socrates :is :mortal }.');
-parser.parse('[:a :b]^<test> [:c :d]!<test2> [:e :f]!<test3>.');
+//parser.parse('[:a :b]^<test> [:c :d]!<test2> [:e :f]!<test3>.');
 //parser.parse(':a :b 5.E3.a:a :b :c.');
 //parser.parse('@prefix gr: <http://purl.org/goodrelations/v1#> . <http://www.acme.com/#store> a gr:Location; gr:hasOpeningHoursSpecification [ a gr:OpeningHoursSpecification; gr:opens "08:00:00"; gr:closes "20:00:00"; gr:hasOpeningHoursDayOfWeek gr:Friday, gr:Monday, gr:Thursday, gr:Tuesday, gr:Wednesday ]; gr:name "Hepp\'s Happy Burger Restaurant" .');
 
 var fs = require('fs');
 var data = fs.readFileSync('n3/secondUseCase/proof.n3', 'utf8');
-//parser.parse(data);
+parser.parse(data);
