@@ -24,7 +24,7 @@ N3Parser._postfix = new RegExp(
     '(?:(?:' + N3Parser._PN_CHARS.source + '|[.:]|' + N3Parser._PLX.source + ')*(?:' + N3Parser._PN_CHARS.source + '|:|' + N3Parser._PLX.source + '))?'
 );
 N3Parser._prefixIRI = new RegExp(
-    /(?:[[{(.\s,;]|^)/.source + '(?:' + N3Parser._prefix.source + ')?:' + N3Parser._postfix.source + /(?![^\s.})\],;])/.source, 'g'
+    '(?:' + N3Parser._prefix.source + ')?:' + N3Parser._postfix.source, 'g'
 );
 N3Parser._iriRegex = /<[^>]*>/g;
 N3Parser._stringRegex = /("|')(\1\1)?(?:[^]*?[^\\])??(?:\\\\)*\2\1/g;
@@ -36,9 +36,9 @@ N3Parser._literalRegex = new RegExp(
     N3Parser._stringRegex.source +
     '((' + N3Parser._datatypeRegex.source + ')|(' + N3Parser._langRegex.source + '))?', 'g'
 );
-N3Parser._numericalRegex = /(?:[[{(.\s]|^)[-+]?(?:(?:(?:(?:[0-9]+\.?[0-9]*)|(?:\.[0-9]+))[eE][-+]?[0-9]+)|(?:[0-9]*(\.[0-9]+))|(?:[0-9]+))(?![^\s.})\],;])/g;
+N3Parser._numericalRegex = /(?:[[{(.\s]|^)[-+]?(?:(?:(?:(?:[0-9]+\.?[0-9]*)|(?:\.[0-9]+))[eE][-+]?[0-9]+)|(?:[0-9]*(\.[0-9]+))|(?:[0-9]+))/g;
 
-// TODO: handle multiple objects with the same @id or use jsonld library to see if it can handle that
+// TODO: merge multiple objects with the same @id or use jsonld library to see if it can handle that
 // TODO: can't handle comments correctly yet
 N3Parser.prototype.parse = function (n3String)
 {
@@ -54,7 +54,7 @@ N3Parser.prototype.parse = function (n3String)
     n3String = this._replaceMatches(n3String, N3Parser._prefixIRI, replacementMap, valueMap, this._replaceIRI);
     console.log(n3String);
 
-    var tokens = n3String.split(/\s+|([;.,{}[\]()])|(<?=>?)/).filter(Boolean); // splits and removes empty elements
+    var tokens = n3String.split(/\s+|([;.,{}[\]()!^])|(<?=>?)/).filter(Boolean); // splits and removes empty elements
     var jsonld = this._statementsOptional(tokens);
     this._updatePathNodes(jsonld); // changes in place
 
@@ -146,7 +146,17 @@ N3Parser.prototype._replaceIRI = function (iri)
 N3Parser.prototype._revertMatches = function (jsonld, invertedMap)
 {
     if (_.isString(jsonld))
-        return jsonld[0] === '#' ? invertedMap[jsonld] : jsonld;
+    {
+        // jsonld doesn't put colons in front of uri's that have the base prefix
+        if (jsonld[0] === '#')
+        {
+            var str = invertedMap[jsonld];
+            if (str[0] === ':')
+                str = str.substring(1);
+            return str;
+        }
+        return jsonld;
+    }
 
     if (_.isArray(jsonld))
         return jsonld.map(function (thingy) { return this._revertMatches(thingy, invertedMap); }, this);
@@ -304,7 +314,7 @@ N3Parser.prototype._declaration = function (tokens)
 
     if (declaration === '@base' || declaration.toUpperCase() === 'BASE')
     {
-        var uri = results.tokens.shift();
+        var uri = tokens.shift();
         return { '@context': { '@base': uri}};
     }
     else if (declaration === '@prefix' || declaration.toUpperCase() === 'PREFIX')
@@ -366,7 +376,6 @@ N3Parser.prototype._expression = function (tokens)
     var pathitem = this._pathitem(tokens); // x
     pathitem = _.isString(pathitem) ? { '@id': pathitem} : pathitem;
     // TODO: problem because there is a big difference between predicates and the rest?
-    // TODO: should check out what the parser does with this
     if (tokens[0] === '!')
     {
         // x!p means [ is p of x ]
@@ -419,7 +428,6 @@ N3Parser.prototype._pathlist = function (tokens)
     return {'@list': list};
 };
 
-// TODO: how do you do named graphs in N3?
 N3Parser.prototype._formulacontent = function (tokens)
 {
     var content = {};
@@ -483,7 +491,6 @@ N3Parser.prototype._combinePredicateObjects = function (predicate, objects, nest
     return jsonld;
 };
 
-// TODO: what to do with predicates with empty prefix?
 N3Parser.prototype._predicate = function (tokens)
 {
     if (tokens[0] === '@has')
@@ -530,7 +537,7 @@ N3Parser.prototype._object = function (tokens)
 // :a :b :5.E3:a :b :c.
 var parser = new N3Parser();
 //parser.parse(':Plato :says { :Socrates :is :mortal }.');
-parser.parse(':Plato [:A :b]!<test> :Socrates.');
+parser.parse('[:a :b]^<test> [:c :d]!<test2> [:e :f]!<test3>.');
 //parser.parse(':a :b 5.E3.a:a :b :c.');
 //parser.parse('@prefix gr: <http://purl.org/goodrelations/v1#> . <http://www.acme.com/#store> a gr:Location; gr:hasOpeningHoursSpecification [ a gr:OpeningHoursSpecification; gr:opens "08:00:00"; gr:closes "20:00:00"; gr:hasOpeningHoursDayOfWeek gr:Friday, gr:Monday, gr:Thursday, gr:Tuesday, gr:Wednesday ]; gr:name "Hepp\'s Happy Burger Restaurant" .');
 
