@@ -3,6 +3,7 @@
  */
 
 var _ = require('lodash');
+var uuid = require('node-uuid');
 
 function N3Parser ()
 {
@@ -37,9 +38,13 @@ N3Parser._literalRegex = new RegExp(
 );
 N3Parser._numericalRegex = /(?:[[{(.\s]|^)[-+]?(?:(?:(?:(?:[0-9]+\.?[0-9]*)|(?:\.[0-9]+))[eE][-+]?[0-9]+)|(?:[0-9]*(\.[0-9]+))|(?:[0-9]+))(?![^\s.})\],;])/g;
 
-// TODO: can't handle comments yet
+// TODO: handle multiple objects with the same @id or use jsonld library to see if it can handle that
+// TODO: can't handle comments correctly yet
 N3Parser.prototype.parse = function (n3String)
 {
+    // clean up simple comments (doesn't handle inline comments and can be incorrect with multiline strings)
+    n3String = n3String.replace(/^\s*#.*$/gm, '');
+
     var replacementMap = {idx: 0};
     var valueMap = {};
     n3String = this._replaceMatches(n3String, N3Parser._literalRegex, replacementMap, valueMap, this._replaceStringLiteral);
@@ -156,29 +161,36 @@ N3Parser.prototype._revertMatches = function (jsonld, invertedMap)
     return result;
 };
 
-N3Parser.prototype._updatePathNodes = function (jsonld)
+N3Parser.prototype._updatePathNodes = function (jsonld, parent)
 {
+
     var self = this;
     if (_.isString(jsonld))
-        return [];
-    if (_.isArray(jsonld))
+        return false;
+
+    var parentChanged = false;
+    var changed = true;
+    while (changed)
     {
-        var pathNodes = _.filter(jsonld.map(function (thingy) { return self._updatePathNodes(thingy) }), 'length');
-        for (var i = 0; i < pathNodes.length; ++i)
-            this._extend(jsonld, pathNodes[i], true);
+        changed = false;
+        // TODO: no way to change parent? (will this ever be necessary? what would it mean?)
+        if (_.isArray(jsonld))
+            changed = _.some(jsonld, function (child) { return self._updatePathNodes(child, jsonld); });
+
+        for (var key in jsonld)
+        {
+            if (key === '..')
+            {
+                this._extend(parent, jsonld[key], true);
+                parentChanged = true;
+                delete jsonld['..'];
+            }
+            else
+                changed = this._updatePathNodes(jsonld[key], jsonld) || changed;
+        }
     }
 
-    for (var key in jsonld)
-    {
-        var pathNodes = this._updatePathNodes(jsonld[key]);
-        for (var i = 0; i < pathNodes.length; ++i)
-            this._extend(jsonld, pathNodes[i], true);
-    }
-
-    var result = jsonld['..'] || [];
-    delete jsonld['..'];
-
-    return result;
+    return parentChanged;
 };
 
 N3Parser.prototype._simplification = function (jsonld, literalKeys)
@@ -443,7 +455,7 @@ N3Parser.prototype._propertylist = function (tokens)
     return jsonld;
 };
 
-N3Parser.prototype._combinePredicateObjects = function (predicate, objects)
+N3Parser.prototype._combinePredicateObjects = function (predicate, objects, nestLevel)
 {
     // simple URIs get converted to { @id: URI}, this needs to be changed for predicates
     if (!_.isString(predicate))
@@ -453,20 +465,17 @@ N3Parser.prototype._combinePredicateObjects = function (predicate, objects)
             predicate = predicate['@id'];
     }
 
+    nestLevel = nestLevel || 0;
     var jsonld = {};
-    // TODO: what if reversed predicate is an object
     if (predicate['@reverse'])
-    {
-        jsonld['@reverse'] = {};
-        jsonld['@reverse'][predicate['@reverse']] = objects;
-    }
+        jsonld['@reverse'] = this._combinePredicateObjects(predicate['@reverse'], objects, nestLevel+1);
     else if (!_.isString(predicate))
     {
-        // TODO: generate unique blank node id
-        var blank = 'TODO1';
-        // TODO: can we have a reverse problem here?
-        // this tells the final parser to move this part up a level?
+        var blank = '_:b_' + uuid.v4();
+        // this tells the final parser to move this part up a level
         jsonld['..'] = [this._extend({'@id': blank}, predicate)];
+        for (var i = 0; i < nestLevel; ++i)
+            jsonld['..'] = {'..': jsonld['..']};
         jsonld[blank] = objects;
     }
     else
@@ -521,10 +530,10 @@ N3Parser.prototype._object = function (tokens)
 // :a :b :5.E3:a :b :c.
 var parser = new N3Parser();
 //parser.parse(':Plato :says { :Socrates :is :mortal }.');
-//parser.parse(':Plato [:A :b] :Socrates.');
+parser.parse(':Plato [:A :b]!<test> :Socrates.');
 //parser.parse(':a :b 5.E3.a:a :b :c.');
 //parser.parse('@prefix gr: <http://purl.org/goodrelations/v1#> . <http://www.acme.com/#store> a gr:Location; gr:hasOpeningHoursSpecification [ a gr:OpeningHoursSpecification; gr:opens "08:00:00"; gr:closes "20:00:00"; gr:hasOpeningHoursDayOfWeek gr:Friday, gr:Monday, gr:Thursday, gr:Tuesday, gr:Wednesday ]; gr:name "Hepp\'s Happy Burger Restaurant" .');
 
 var fs = require('fs');
 var data = fs.readFileSync('n3/secondUseCase/proof.n3', 'utf8');
-parser.parse(data);
+//parser.parse(data);
