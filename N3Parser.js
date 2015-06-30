@@ -5,10 +5,7 @@
 var _ = require('lodash');
 var uuid = require('node-uuid');
 
-function N3Parser ()
-{
-
-}
+function N3Parser () {}
 
 // TODO: 32 bit unicode (use something like http://apps.timwhitlock.info/js/regex# ? or use xregexp with https://gist.github.com/slevithan/2630353 )
 N3Parser._PN_CHARS_BASE = /[A-Z_a-z\u00c0-\u00d6\u00d8-\u00f6\u00f8-\u02ff\u0370-\u037d\u037f-\u1fff\u200c-\u200d\u2070-\u218f\u2c00-\u2fef\u3001-\ud7ff\uf900-\ufdcf\ufdf0-\ufffd]/g;
@@ -71,6 +68,7 @@ N3Parser.prototype.parse = function (n3String)
     jsonld = this._revertMatches(jsonld, valueMap);
     this._unFlatten(jsonld); // edits in place
     console.log(JSON.stringify(jsonld, null, 4));
+    return jsonld;
 };
 
 N3Parser.prototype._replaceMatches = function (string, regex, map, valueMap, callback)
@@ -153,6 +151,7 @@ N3Parser.prototype._revertMatches = function (jsonld, invertedMap)
         if (jsonld[0] === '%')
         {
             var str = invertedMap[jsonld];
+            // TODO: is wrong! only do this for predicates and type values, need to differentiate between base and vocab, will have to change some URIs to full
             if (str[0] === ':')
                 str = str.substring(1);
             return str;
@@ -374,7 +373,7 @@ N3Parser.prototype._statement = function (tokens)
     if (tokens[0] === '@base' || tokens[0] === 'BASE' || tokens[0] === '@prefix' || tokens[0] === 'PREFIX' || tokens[0] === '@keywords')
         return this._declaration(tokens);
 
-    if (tokens[0] === '@forAll' || tokens[0] === '@forSome')
+    if (tokens[0] === '@forAll' || tokens[0] === 'forAll' || tokens[0] === '@forSome' || tokens[0] === 'forSome')
         return this._quantification(tokens);
 
     return this._simpleStatement(tokens);
@@ -420,6 +419,8 @@ N3Parser.prototype._declaration = function (tokens)
 N3Parser.prototype._quantification = function (tokens)
 {
     var quantifier = tokens.shift();
+    if (quantifier[0] !== '@')
+        quantifier = '@' + quantifier;
     var symbols = [];
     while (tokens[0] !== '.')
     {
@@ -613,12 +614,17 @@ module.exports = N3Parser;
 // :a :b :c.a:a :b :c.
 // :a :b :5.E3:a :b :c.
 var parser = new N3Parser();
-//parser.parse(':Plato :says { :Socrates :is :mortal }.');
+//var jsonld = parser.parse(':Plato :says { :Socrates :is :mortal }.');
 //parser.parse('[:a :b]^<test> [:c :d]!<test2> [:e :f]!<test3>.');
-//parser.parse(':a :b 5.E3.a:a :b :c.');
-//parser.parse('@prefix gr: <http://purl.org/goodrelations/v1#> . <http://www.acme.com/#store> a gr:Location; gr:hasOpeningHoursSpecification [ a gr:OpeningHoursSpecification; gr:opens "08:00:00"; gr:closes "20:00:00"; gr:hasOpeningHoursDayOfWeek gr:Friday, gr:Monday, gr:Thursday, gr:Tuesday, gr:Wednesday ]; gr:name "Hepp\'s Happy Burger Restaurant" .');
+var jsonld = parser.parse('[:a :b] :c [:e :f].');
+//var jsonld = parser.parse(':a :b 5.E3.a:a :b :c.');
+//var jsonld = parser.parse('@prefix gr: <http://purl.org/goodrelations/v1#> . <http://www.acme.com/#store> a gr:Location; gr:hasOpeningHoursSpecification [ a gr:OpeningHoursSpecification; gr:opens "08:00:00"; gr:closes "20:00:00"; gr:hasOpeningHoursDayOfWeek gr:Friday, gr:Monday, gr:Thursday, gr:Tuesday, gr:Wednesday ]; gr:name "Hepp\'s Happy Burger Restaurant" .');
 //parser.parse(':a :b :c. :c :d :e.');
 
 var fs = require('fs');
 var data = fs.readFileSync('n3/secondUseCase/proof.n3', 'utf8');
 //parser.parse(data);
+
+var JSONLDParser = require('./JSONLDParser');
+var jp = new JSONLDParser();
+console.log(jp.parse(jsonld));
