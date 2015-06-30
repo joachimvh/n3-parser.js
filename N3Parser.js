@@ -10,7 +10,7 @@ function N3Parser ()
 
 }
 
-// TODO: 32 bit unicode
+// TODO: 32 bit unicode (use something like http://apps.timwhitlock.info/js/regex# ? or use xregexp with https://gist.github.com/slevithan/2630353 )
 N3Parser._PN_CHARS_BASE = /[A-Z_a-z\u00c0-\u00d6\u00d8-\u00f6\u00f8-\u02ff\u0370-\u037d\u037f-\u1fff\u200c-\u200d\u2070-\u218f\u2c00-\u2fef\u3001-\ud7ff\uf900-\ufdcf\ufdf0-\ufffd]/g;
 N3Parser._PN_CHARS_U = new RegExp('(?:' + N3Parser._PN_CHARS_BASE.source + '|_)');
 N3Parser._PN_CHARS = new RegExp('(?:' + N3Parser._PN_CHARS_U.source + '|' + /[-0-9\u00b7\u0300-\u036f\u203f-\u2040]/.source + ')');
@@ -27,6 +27,7 @@ N3Parser._prefixIRI = new RegExp(
     '(?:' + N3Parser._prefix.source + ')?:' + N3Parser._postfix.source, 'g'
 );
 N3Parser._iriRegex = /<[^>]*>/g;
+// TODO: lookbefore to check if there was no # (xregexp can support lookbefore if necessary), also do multiple runs so literals in-between 'disappear'
 N3Parser._stringRegex = /("|')(\1\1)?(?:[^]*?[^\\])??(?:\\\\)*\2\1/g;
 N3Parser._datatypeRegex = new RegExp(
     '\\^\\^(?:(?:' + N3Parser._iriRegex.source + ')|(?:' + N3Parser._prefixIRI.source + '))', 'g'
@@ -38,7 +39,6 @@ N3Parser._literalRegex = new RegExp(
 );
 N3Parser._numericalRegex = /(?:[[{(.\s]|^)[-+]?(?:(?:(?:(?:[0-9]+\.?[0-9]*)|(?:\.[0-9]+))[eE][-+]?[0-9]+)|(?:[0-9]*(\.[0-9]+))|(?:[0-9]+))/g;
 
-// TODO: merge multiple objects with the same @id or use jsonld library to see if it can handle that
 // TODO: can't handle comments correctly yet
 N3Parser.prototype.parse = function (n3String)
 {
@@ -52,7 +52,7 @@ N3Parser.prototype.parse = function (n3String)
     var literalKeys = Object.keys(valueMap);
     n3String = this._replaceMatches(n3String, N3Parser._iriRegex, replacementMap, valueMap, this._replaceIRI);
     n3String = this._replaceMatches(n3String, N3Parser._prefixIRI, replacementMap, valueMap, this._replaceIRI);
-    console.log(n3String);
+    //console.log(n3String);
 
     var tokens = n3String.split(/\s+|([;.,{}[\]()!^])|(<?=>?)/).filter(Boolean); // splits and removes empty elements
     var jsonld = this._statementsOptional(tokens);
@@ -66,8 +66,10 @@ N3Parser.prototype.parse = function (n3String)
         jsonld = this._extend(jsonld, child);
     }
 
+    // TODO: unflatten
     jsonld = this._simplification(jsonld, literalKeys);
     jsonld = this._revertMatches(jsonld, valueMap);
+    this._unFlatten(jsonld); // edits in place
     console.log(JSON.stringify(jsonld, null, 4));
 };
 
@@ -99,7 +101,7 @@ N3Parser.prototype._replaceMatches = function (string, regex, map, valueMap, cal
             callback(matchString);
         if (!map[matchString])
         {
-            map[matchString] = '#' + ++map.idx;
+            map[matchString] = '%' + ++map.idx;
             valueMap[map[matchString]] = callback ? callback(matchString) : matchString;
         }
 
@@ -148,7 +150,7 @@ N3Parser.prototype._revertMatches = function (jsonld, invertedMap)
     if (_.isString(jsonld))
     {
         // jsonld doesn't put colons in front of uri's that have the base prefix
-        if (jsonld[0] === '#')
+        if (jsonld[0] === '%')
         {
             var str = invertedMap[jsonld];
             if (str[0] === ':')
@@ -220,7 +222,6 @@ N3Parser.prototype._simplification = function (jsonld, literalKeys, orderedList)
             for (var i = 0; i < simplified.length; ++i)
             {
                 var obj = simplified[i];
-                // TODO: can we have identical non-string @ids?
                 if (obj['@id'] && _.isString(obj['@id']))
                     idMap[obj['@id']] = _.extend(idMap[obj['@id']] || {}, obj);
                 else
@@ -253,6 +254,58 @@ N3Parser.prototype._simplification = function (jsonld, literalKeys, orderedList)
                   return type['@id'];
                 return type;
             });
+    }
+
+    return result;
+};
+
+// TODO: does this still belong in this class?
+N3Parser.prototype._unFlatten = function (jsonld)
+{
+    // there is only 1 root node so nothing will change
+    if (!jsonld['@graph'])
+        return jsonld;
+
+    var roots = {};
+
+    for (var i = 0; i < jsonld['@graph'].length; ++i)
+    {
+        var node = jsonld['@graph'][i];
+        if (node['@id'])
+            roots[node['@id']] = node;
+    }
+
+    var references = this._findReferences(jsonld, roots);
+    // TODO: be careful of loops in triple data
+    for (var key in references)
+    {
+        if (references[key].length === 1 && references[key][0] && roots[key])
+        {
+            _.extend(references[key][0], roots[key]); // we actually want lodash extend functionality here to not duplicate things like @id
+            jsonld['@graph'] = _.without(jsonld['@graph'], roots[key]);
+        }
+    }
+    return jsonld;
+};
+
+N3Parser.prototype._findReferences = function (jsonld, roots)
+{
+    if (_.isString(jsonld))
+        return {};
+
+    var self = this;
+    if (_.isArray(jsonld))
+        return jsonld.reduce(function (prev, val) { return self._extend(prev, self._findReferences(val, roots)); }, {});
+
+    var result = {};
+    var id = jsonld['@id'];
+    if (id && jsonld !== roots[id])
+        result[id] = (result[id] || []).concat([jsonld]);
+
+    for (var key in jsonld)
+    {
+        result = this._extend(result, this._findReferences(jsonld[key], roots));
+        result = this._extend(result, {key: [undefined]}); // we need to count predicates also for correctness, but won't replace them
     }
 
     return result;
@@ -553,6 +606,10 @@ N3Parser.prototype._object = function (tokens)
 {
     return this._expression(tokens);
 };
+
+
+module.exports = N3Parser;
+
 // :a :b :c.a:a :b :c.
 // :a :b :5.E3:a :b :c.
 var parser = new N3Parser();
@@ -560,7 +617,8 @@ var parser = new N3Parser();
 //parser.parse('[:a :b]^<test> [:c :d]!<test2> [:e :f]!<test3>.');
 //parser.parse(':a :b 5.E3.a:a :b :c.');
 //parser.parse('@prefix gr: <http://purl.org/goodrelations/v1#> . <http://www.acme.com/#store> a gr:Location; gr:hasOpeningHoursSpecification [ a gr:OpeningHoursSpecification; gr:opens "08:00:00"; gr:closes "20:00:00"; gr:hasOpeningHoursDayOfWeek gr:Friday, gr:Monday, gr:Thursday, gr:Tuesday, gr:Wednesday ]; gr:name "Hepp\'s Happy Burger Restaurant" .');
+//parser.parse(':a :b :c. :c :d :e.');
 
 var fs = require('fs');
 var data = fs.readFileSync('n3/secondUseCase/proof.n3', 'utf8');
-parser.parse(data);
+//parser.parse(data);
