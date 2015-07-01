@@ -55,18 +55,19 @@ N3Parser.prototype.parse = function (n3String)
     var jsonld = this._statementsOptional(tokens);
     this._updatePathNodes(jsonld); // changes in place
 
-    // default graph is not always necessary to indicate
-    if (jsonld['@graph'] && jsonld['@graph'].length === 1)
-    {
-        var child = jsonld['@graph'][0];
-        delete jsonld['@graph'];
-        jsonld = this._extend(jsonld, child);
-    }
-
     // TODO: unflatten
     jsonld = this._simplification(jsonld, literalKeys);
     jsonld = this._revertMatches(jsonld, valueMap);
     this._unFlatten(jsonld); // edits in place
+
+    // default graph is not always necessary to indicate
+    //if (jsonld['@graph'] && jsonld['@graph'].length === 1)
+    //{
+    //    var child = jsonld['@graph'][0];
+    //    delete jsonld['@graph'];
+    //    jsonld = this._extend(jsonld, child);
+    //}
+
     console.log(JSON.stringify(jsonld, null, 4));
     return jsonld;
 };
@@ -152,6 +153,7 @@ N3Parser.prototype._revertMatches = function (jsonld, invertedMap)
         {
             var str = invertedMap[jsonld];
             // TODO: is wrong! only do this for predicates and type values, need to differentiate between base and vocab, will have to change some URIs to full
+            // TODO: prolly best to simply convert these URIs to full so <#lemma1> doesn't become :#lemma1?
             if (str[0] === ':')
                 str = str.substring(1);
             return str;
@@ -238,7 +240,7 @@ N3Parser.prototype._simplification = function (jsonld, literalKeys, orderedList)
     for (var v in jsonld)
     {
         result[v] = this._simplification(jsonld[v], literalKeys, v === '@list');
-        if (_.isArray(result[v]) && result[v].length === 1)
+        if (_.isArray(result[v]) && result[v].length === 1 && v !== '@list')
             result[v] = result[v][0];
     }
 
@@ -615,6 +617,7 @@ module.exports = N3Parser;
 // :a :b :5.E3:a :b :c.
 var parser = new N3Parser();
 //var jsonld = parser.parse(':Plato :says { :Socrates :is :mortal }.');
+//var jsonld = parser.parse('{ :Plato :is :immortal } :says { :Socrates :is { :person :is :mortal } . :Donald :is :Duck }.');
 //parser.parse('[:a :b]^<test> [:c :d]!<test2> [:e :f]!<test3>.');
 var jsonld = parser.parse('[:a :b] :c [:e :f].');
 //var jsonld = parser.parse(':a :b 5.E3.a:a :b :c.');
@@ -623,7 +626,7 @@ var jsonld = parser.parse('[:a :b] :c [:e :f].');
 
 var fs = require('fs');
 var data = fs.readFileSync('n3/secondUseCase/proof.n3', 'utf8');
-//parser.parse(data);
+//var jsonld = parser.parse(data);
 
 var JSONLDParser = require('./JSONLDParser');
 var jp = new JSONLDParser();

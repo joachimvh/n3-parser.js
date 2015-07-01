@@ -9,20 +9,32 @@ function JSONLDParser () {}
 
 // TODO: currently only focusing on JSON-LD that can be generated with N3Parser.js
 
-JSONLDParser.prototype.parse = function (jsonld, context)
+JSONLDParser.prototype.parse = function (jsonld)
+{
+    // TODO: not sure if this will never give issues
+    var ignoreGraph = _.every(jsonld, function (val, key) { return key === '@context' || key === '@graph'; });
+    var graphList = [];
+    var test = this._parse(jsonld, null, [], graphList, ignoreGraph);
+    return test.join('\n');
+};
+
+JSONLDParser.prototype._parse = function (jsonld, context, graphList, root, ignoreGraph)
 {
     // TODO: handle quotes(+escape)/language/datatype
     if (_.isString(jsonld) || _.isNumber(jsonld))
         return jsonld;
 
+    // TODO: flatten might break things here
     if (_.isArray(jsonld))
-        return jsonld.map(function (child) { return this.parse(child, context);}, this).join('');
+        return _.flatten(jsonld.map(function (child) { return this._parse(child, context, graphList);}, this));
 
     if (Object.keys(jsonld).length === 0)
         return '[]';
 
     var strings = [];
-    context = context || {};
+    context = context || {'_':'_'}; // support for blank nodes
+    var contextStrings = [];
+    // TODO: what if there is context without a graph? (is this allowed?)
     if (jsonld['@context'])
     {
         context = _.extend({}, context);
@@ -31,30 +43,37 @@ JSONLDParser.prototype.parse = function (jsonld, context)
             var val = jsonld['@context'][key];
             if (key === '@vocab' || key === '@base') // TODO: not a problem for N3Parser output though ...
                 key = '';
-            strings.push(format('PREFIX %s: <%s>\n', key, val));
+            contextStrings.push(format('PREFIX %s: <%s>', key, val));
             context[key] = val;
         }
     }
+    // TODO: shouldn't overwrite id if it already has a value
+    var id = jsonld['@id'] && this._URIfix(jsonld['@id'], context);
     if (jsonld['@graph'])
-        strings.push(format('{\n%s}', this.parse(jsonld['@graph'], context)));
+    {
+        // TODO: how to handle prefixes? this would place dots after them
+        var localList = [];
+        this._parse(jsonld['@graph'], context, localList, true);
+        id = format(ignoreGraph ? '%s' : '{ %s }', localList.join(' . '));
+    }
 
-    // TODO: technically these can also have other properties such as type, let's assume they don't for now
+    // TODO: this is wrong, list might contain triples that need to be put somewhere else
     if (jsonld['@list'])
-        return format('( %s )', jsonld['@list'].map(function (child) { return this.parse(child, context);}, this).join(' '));
+        id = format('( %s )', jsonld['@list'].map(function (child) { return this._parse(child, context, graphList);}, this).join(' '));
+
+    // TODO: context is being ignored here
     if (jsonld['@forAll'])
-        return format('@forAll %s .\n', jsonld['@forAll'].map(function (child) { return this.parse(child, context);}, this).join(' , '));
+        return format('@forAll %s .', jsonld['@forAll'].map(function (child) { return this._parse(child, context, graphList);}, this).join(' , '));
     if (jsonld['@forSome'])
-        return format('@forSome %s .\n', jsonld['@forAll'].map(function (child) { return this.parse(child, context);}, this).join(' , '));
+        return format('@forSome %s .', jsonld['@forAll'].map(function (child) { return this._parse(child, context, graphList);}, this).join(' , '));
 
     // TODO: @id, @type, @reverse (can only happen in specific cases when coming from parser), blank nodes with no @id
-    var id = jsonld['@id'];
     // TODO: handle blank nodes generated for special predicates
-    var uri = id && this._URIfix(id, context);
     var predicateObjectList = [];
     var rest = [];
     for (var key in jsonld)
     {
-        if (key !== '@id' && key !== '@graph' && key !== '@context')
+        if (key !== '@id' && key !== '@graph' && key !== '@context' && key !== '@list')
         {
             var val = jsonld[key];
             var predicate = this._URIfix(key, context);
@@ -67,13 +86,15 @@ JSONLDParser.prototype.parse = function (jsonld, context)
             var objects = [];
             for (var i = 0; i < val.length; ++i)
             {
-                var object = this.parse(val[i], context);
-                if (val[i]['@id'])
+                var object = this._parse(val[i], context, graphList);
+                if (val[i]['@id'] && Object.keys(val[i]).length > 1)
                 {
-                    // TODO: should check for empty subresults
-                    rest.push(object);
+                    for (var j = 0; j < object.length; ++j)
+                        graphList.push(object[j]);
                     object = this._URIfix(val[i]['@id'], context);
                 }
+                if (predicate === 'a')
+                    object = this._URIfix(object, context);
                 objects.push(object);
             }
             predicateObjectList.push(format('%s %s', predicate, objects.join(' , ')));
@@ -83,29 +104,35 @@ JSONLDParser.prototype.parse = function (jsonld, context)
     if (predicateObjectList.length > 0)
     {
         if (id)
-            strings.push(format('%s %s .\n', uri, predicateObjectList.join(' ; ')));
+            graphList.push(format('%s %s', id, predicateObjectList.join(' ; ')));
         else
-            strings.push(format('[ %s ]\n', predicateObjectList.join(' ; '))); // TODO: find out when I need a dot here
+            strings.push(format('[ %s ]', predicateObjectList.join(' ; '))); // TODO: find out when I need a dot here
     }
-    strings = strings.concat(rest);
+    strings.push(id);
 
-    return strings.join('');
+    //if (root)
+        //strings = [strings.join(' . ') + ' . '];
+
+    // handle context after the joining
+    //strings = contextStrings.concat(strings);
+
+    return strings;
 };
 
 JSONLDParser.prototype._URIfix = function (id, context)
 {
     var colonIdx = id.indexOf(':');
-    var prefix = null;
-    var suffix = id;
-    if (colonIdx >= 0 && context[id.substring(0, colonIdx)] && id.substr(colonIdx+1, 2) !== '//')
+    if (colonIdx >= 0)
     {
-        prefix = id.substring(0, colonIdx);
-        suffix = id.substring(colonIdx + 1);
+        var prefix = id.substring(0, colonIdx);
+        var suffix = id.substr(colonIdx+1);
+        if ((context[prefix] || prefix === '_') && suffix.substr(0, 2) !== '//')
+            return format('%s:%s', prefix, suffix);
     }
-    else if (colonIdx < 0)
-        prefix = '';
+    else
+        return format(':%s', id);
 
-    return prefix === null ? format('<%s>', id) : format('%s:%s', prefix, suffix);
+    return format('<%s>', id);
 };
 
 module.exports = JSONLDParser;
