@@ -25,8 +25,23 @@ JSONLDParser.prototype.parse = function (jsonld)
 JSONLDParser.prototype._parse = function (jsonld, context, graphList, root, ignoreGraph)
 {
     // TODO: handle quotes(+escape)/language/datatype
-    if (_.isString(jsonld) || _.isNumber(jsonld))
+    if (_.isNumber(jsonld))
         return jsonld;
+
+    if (_.isString(jsonld))
+        jsonld = {'@value': jsonld};
+    if (jsonld['@value'])
+    {
+        var result = format('"%s"', jsonld['@value']);
+        // add extra quotes for multiline strings
+        if (result.indexOf('\n') >= 0 || result.indexOf('\r') >= 0)
+            result = format('""%s""', result);
+        if (jsonld['@language'])
+            result = format('%s@%s', result, jsonld['@language']);
+        if (jsonld['@type'])
+            result = format('%s^^%s', result, this._URIfix(jsonld['@type'], context));
+        return result;
+    }
 
     // TODO: flatten might break things here
     // TODO: should make sure this never triggers and always gets caught on a higher level?
@@ -47,7 +62,7 @@ JSONLDParser.prototype._parse = function (jsonld, context, graphList, root, igno
         for (var key in jsonld['@context'])
         {
             var val = jsonld['@context'][key];
-            if (key === '@vocab' || key === '@base') // TODO: not a problem for N3Parser output though ...
+            if (key === '@vocab' || key === '@base')
                 key = '';
             graphList.push(format('PREFIX %s: <%s>\n', key, val));
             context[key] = val;
@@ -73,7 +88,7 @@ JSONLDParser.prototype._parse = function (jsonld, context, graphList, root, igno
     if (jsonld['@forSome'])
         return format('@forSome %s .', jsonld['@forAll'].map(function (child) { return this._parse(child, context, graphList);}, this).join(' , '));
 
-    // TODO: @id, @type, @reverse (can only happen in specific cases when coming from parser), blank nodes with no @id
+    // TODO: @reverse (can only happen in specific cases when coming from parser)
     // TODO: handle blank nodes generated for special predicates
     var predicateObjectList = [];
     for (var key in jsonld)
@@ -93,7 +108,12 @@ JSONLDParser.prototype._parse = function (jsonld, context, graphList, root, igno
             var objects = [];
             for (var i = 0; i < val.length; ++i)
             {
-                var object = this._parse(val[i], context, graphList);
+                var object;
+                // special case since these don't use @id blocks
+                if (predicate === 'a')
+                    object = val[i]
+                else
+                    object = this._parse(val[i], context, graphList);
                 if (predicate === 'a')
                     object = this._URIfix(object, context);
                 objects.push(object);
@@ -135,8 +155,8 @@ JSONLDParser.prototype._URIfix = function (id, context)
         if ((context[prefix] || prefix === '_') && suffix.substr(0, 2) !== '//')
             return format('%s:%s', prefix, suffix);
     }
-    else
-        return format(':%s', id);
+    //else
+    //    return format(':%s', id);
 
     return format('<%s>', id);
 };

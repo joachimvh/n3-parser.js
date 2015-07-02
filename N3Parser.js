@@ -144,31 +144,34 @@ N3Parser.prototype._replaceIRI = function (iri)
     return iri;
 };
 
-N3Parser.prototype._revertMatches = function (jsonld, invertedMap)
+N3Parser.prototype._revertMatches = function (jsonld, invertedMap, baseURI)
 {
+    baseURI = baseURI || 'http://www.example.org/';
     if (_.isString(jsonld))
     {
         // jsonld doesn't put colons in front of uri's that have the base prefix
         if (jsonld[0] === '%')
         {
             var str = invertedMap[jsonld];
-            // TODO: is wrong! only do this for predicates and type values, need to differentiate between base and vocab, will have to change some URIs to full
-            // TODO: prolly best to simply convert these URIs to full so <#lemma1> doesn't become :#lemma1?
+            // TODO: current solution to not confuse JSONLDParser
             if (str[0] === ':')
-                str = str.substring(1);
+                str = baseURI + str.substring(1);
             return str;
         }
         return jsonld;
     }
 
     if (_.isArray(jsonld))
-        return jsonld.map(function (thingy) { return this._revertMatches(thingy, invertedMap); }, this);
+        return jsonld.map(function (thingy) { return this._revertMatches(thingy, invertedMap, baseURI); }, this);
+
+    if (jsonld['@context'] && jsonld['@context']['@vocab'])
+        baseURI = invertedMap[jsonld['@context']['@vocab']];
 
     var result = {};
     for (var key in jsonld)
     {
-        var val = this._revertMatches(jsonld[key], invertedMap);
-        key = this._revertMatches(key, invertedMap);
+        var val = this._revertMatches(jsonld[key], invertedMap, baseURI);
+        key = this._revertMatches(key, invertedMap, baseURI);
         result[key] = val;
     }
     return result;
@@ -395,6 +398,7 @@ N3Parser.prototype._declaration = function (tokens)
     {
         var prefix = tokens.shift();
         var uri = tokens.shift();
+        // TODO: this is actually not correct in the current implementation, should remove this (after revert strings dependency is removed)
         if (prefix === ':')
             return { '@context': { '@vocab': uri}};
         else
@@ -616,6 +620,7 @@ module.exports = N3Parser;
 // :a :b :c.a:a :b :c.
 // :a :b :5.E3:a :b :c.
 var parser = new N3Parser();
+//var jsonld = parser.parse(':a :b "c\n\\"d"@nl-de.');
 //var jsonld = parser.parse(':Plato :says { :Socrates :is :mortal }.');
 //var jsonld = parser.parse('{ :Plato :is :immortal } :says { :Socrates :is { :person :is :mortal } . :Donald a :Duck }.');
 //parser.parse('[:a :b]^<test> [:c :d]!<test2> [:e :f]!<test3>.');
@@ -626,7 +631,7 @@ var parser = new N3Parser();
 
 var fs = require('fs');
 var data = fs.readFileSync('n3/secondUseCase/proof.n3', 'utf8');
-//var jsonld = parser.parse(data);
+var jsonld = parser.parse(data);
 
 var JSONLDParser = require('./JSONLDParser');
 var jp = new JSONLDParser();
