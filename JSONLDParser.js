@@ -8,6 +8,7 @@ var format = require('util').format;
 function JSONLDParser () {}
 
 // TODO: currently only focusing on JSON-LD that can be generated with N3Parser.js
+// TODO: indentation
 
 JSONLDParser.prototype.parse = function (jsonld)
 {

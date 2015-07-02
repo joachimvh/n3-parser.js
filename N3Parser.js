@@ -68,7 +68,7 @@ N3Parser.prototype.parse = function (n3String)
         jsonld = this._extend(jsonld, child);
     }
 
-    console.log(JSON.stringify(jsonld, null, 4));
+    //console.log(JSON.stringify(jsonld, null, 4));
     return jsonld;
 };
 
@@ -286,6 +286,7 @@ N3Parser.prototype._unFlatten = function (jsonld)
         if (references[key].length === 1 && references[key][0] && roots[key])
         {
             _.extend(references[key][0], roots[key]); // we actually want lodash extend functionality here to not duplicate things like @id
+            delete references[key][0]['@id']; // deleting the id's for now so JSONLDParser gives nicer N3 output
             jsonld['@graph'] = _.without(jsonld['@graph'], roots[key]);
         }
     }
@@ -309,7 +310,7 @@ N3Parser.prototype._findReferences = function (jsonld, roots)
     for (var key in jsonld)
     {
         result = this._extend(result, this._findReferences(jsonld[key], roots));
-        result = this._extend(result, {key: [undefined]}); // we need to count predicates also for correctness, but won't replace them
+        result = this._extend(result, _.object([key], [[undefined]])); // we need to count predicates also for correctness, but won't replace them
     }
 
     return result;
@@ -631,8 +632,8 @@ var parser = new N3Parser();
 
 var fs = require('fs');
 var data = fs.readFileSync('n3/secondUseCase/proof.n3', 'utf8');
-var jsonld = parser.parse(data);
+//var jsonld = parser.parse(data);
 
 var JSONLDParser = require('./JSONLDParser');
 var jp = new JSONLDParser();
-console.log(jp.parse(jsonld));
+//console.log(jp.parse(jsonld));
