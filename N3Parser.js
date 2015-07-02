@@ -281,13 +281,22 @@ N3Parser.prototype._unFlatten = function (jsonld)
 
     var references = this._findReferences(jsonld, roots);
     // TODO: be careful of loops in triple data
-    for (var key in references)
+    for (var key in roots)
     {
-        if (references[key].length === 1 && references[key][0] && roots[key])
+        if (references[key])
         {
-            _.extend(references[key][0], roots[key]); // we actually want lodash extend functionality here to not duplicate things like @id
-            delete references[key][0]['@id']; // deleting the id's for now so JSONLDParser gives nicer N3 output
-            jsonld['@graph'] = _.without(jsonld['@graph'], roots[key]);
+            if (references[key].length === 1 && references[key][0])
+            {
+                _.extend(references[key][0], roots[key]); // we actually want lodash extend functionality here to not duplicate things like @id
+                if (key.substr(0, 2) === '_:')
+                    delete references[key][0]['@id']; // deleting the id's for now so JSONLDParser gives nicer N3 output
+                jsonld['@graph'] = _.without(jsonld['@graph'], roots[key]);
+            }
+        }
+        else
+        {
+            if (key.substr(0, 2) === '_:')
+                delete roots[key]['@id']; // deleting the id's for now so JSONLDParser gives nicer N3 output
         }
     }
     return jsonld;
@@ -304,13 +313,14 @@ N3Parser.prototype._findReferences = function (jsonld, roots)
 
     var result = {};
     var id = jsonld['@id'];
-    if (id && jsonld !== roots[id])
+    if (id && roots[id] && jsonld !== roots[id])
         result[id] = (result[id] || []).concat([jsonld]);
 
     for (var key in jsonld)
     {
         result = this._extend(result, this._findReferences(jsonld[key], roots));
-        result = this._extend(result, _.object([key], [[undefined]])); // we need to count predicates also for correctness, but won't replace them
+        if (roots[key])
+            result = this._extend(result, _.object([key], [[undefined]])); // we need to count predicates also for correctness, but won't replace them
     }
 
     return result;
