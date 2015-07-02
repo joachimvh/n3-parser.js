@@ -61,12 +61,12 @@ N3Parser.prototype.parse = function (n3String)
     this._unFlatten(jsonld); // edits in place
 
     // default graph is not always necessary to indicate
-    //if (jsonld['@graph'] && jsonld['@graph'].length === 1)
-    //{
-    //    var child = jsonld['@graph'][0];
-    //    delete jsonld['@graph'];
-    //    jsonld = this._extend(jsonld, child);
-    //}
+    if (jsonld['@graph'] && jsonld['@graph'].length === 1 && _.every(jsonld, function (val, key) { return key === '@context' || key === '@graph'; }))
+    {
+        var child = jsonld['@graph'][0];
+        delete jsonld['@graph'];
+        jsonld = this._extend(jsonld, child);
+    }
 
     console.log(JSON.stringify(jsonld, null, 4));
     return jsonld;
@@ -240,7 +240,7 @@ N3Parser.prototype._simplification = function (jsonld, literalKeys, orderedList)
     for (var v in jsonld)
     {
         result[v] = this._simplification(jsonld[v], literalKeys, v === '@list');
-        if (_.isArray(result[v]) && result[v].length === 1 && v !== '@list')
+        if (_.isArray(result[v]) && result[v].length === 1 && v !== '@list' && v !== '@graph')
             result[v] = result[v][0];
     }
 
@@ -617,9 +617,9 @@ module.exports = N3Parser;
 // :a :b :5.E3:a :b :c.
 var parser = new N3Parser();
 //var jsonld = parser.parse(':Plato :says { :Socrates :is :mortal }.');
-//var jsonld = parser.parse('{ :Plato :is :immortal } :says { :Socrates :is { :person :is :mortal } . :Donald :is :Duck }.');
+//var jsonld = parser.parse('{ :Plato :is :immortal } :says { :Socrates :is { :person :is :mortal } . :Donald a :Duck }.');
 //parser.parse('[:a :b]^<test> [:c :d]!<test2> [:e :f]!<test3>.');
-var jsonld = parser.parse('[:a :b] :c [:e :f].');
+//var jsonld = parser.parse('[:a :b] :c [:e :f].');
 //var jsonld = parser.parse(':a :b 5.E3.a:a :b :c.');
 //var jsonld = parser.parse('@prefix gr: <http://purl.org/goodrelations/v1#> . <http://www.acme.com/#store> a gr:Location; gr:hasOpeningHoursSpecification [ a gr:OpeningHoursSpecification; gr:opens "08:00:00"; gr:closes "20:00:00"; gr:hasOpeningHoursDayOfWeek gr:Friday, gr:Monday, gr:Thursday, gr:Tuesday, gr:Wednesday ]; gr:name "Hepp\'s Happy Burger Restaurant" .');
 //parser.parse(':a :b :c. :c :d :e.');

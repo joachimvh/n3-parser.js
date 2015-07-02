@@ -14,8 +14,12 @@ JSONLDParser.prototype.parse = function (jsonld)
     // TODO: not sure if this will never give issues
     var ignoreGraph = _.every(jsonld, function (val, key) { return key === '@context' || key === '@graph'; });
     var graphList = [];
-    var test = this._parse(jsonld, null, [], graphList, ignoreGraph);
-    return test.join('\n');
+    var id = this._parse(jsonld, null, graphList, true, ignoreGraph);
+    // TODO: not sure about the output yet
+    if (graphList.length > 0)
+        return graphList.join('');
+    else
+        return format('%s .', id); // TODO: will this ever happen?
 };
 
 JSONLDParser.prototype._parse = function (jsonld, context, graphList, root, ignoreGraph)
@@ -25,16 +29,18 @@ JSONLDParser.prototype._parse = function (jsonld, context, graphList, root, igno
         return jsonld;
 
     // TODO: flatten might break things here
+    // TODO: should make sure this never triggers and always gets caught on a higher level?
     if (_.isArray(jsonld))
-        return _.flatten(jsonld.map(function (child) { return this._parse(child, context, graphList);}, this));
+    {
+        throw 'should not happen anymore';
+        //return _.flatten(jsonld.map(function (child) { return this._parse(child, context, graphList);}, this));
+    }
 
     if (Object.keys(jsonld).length === 0)
         return '[]';
 
-    var strings = [];
-    context = context || {'_':'_'}; // support for blank nodes
-    var contextStrings = [];
-    // TODO: what if there is context without a graph? (is this allowed?)
+    context = context || {'_':'_'};
+    // TODO: what if there is context without a graph?
     if (jsonld['@context'])
     {
         context = _.extend({}, context);
@@ -43,7 +49,7 @@ JSONLDParser.prototype._parse = function (jsonld, context, graphList, root, igno
             var val = jsonld['@context'][key];
             if (key === '@vocab' || key === '@base') // TODO: not a problem for N3Parser output though ...
                 key = '';
-            contextStrings.push(format('PREFIX %s: <%s>', key, val));
+            graphList.push(format('PREFIX %s: <%s>\n', key, val));
             context[key] = val;
         }
     }
@@ -53,8 +59,8 @@ JSONLDParser.prototype._parse = function (jsonld, context, graphList, root, igno
     {
         // TODO: how to handle prefixes? this would place dots after them
         var localList = [];
-        this._parse(jsonld['@graph'], context, localList, true);
-        id = format(ignoreGraph ? '%s' : '{ %s }', localList.join(' . '));
+        var childIDs = jsonld['@graph'].map(function (child) { return this._parse(child, context, localList, true); }, this);
+        id = format(ignoreGraph ? '%s' : '{ %s }', localList.join(' '));
     }
 
     // TODO: this is wrong, list might contain triples that need to be put somewhere else
@@ -70,7 +76,6 @@ JSONLDParser.prototype._parse = function (jsonld, context, graphList, root, igno
     // TODO: @id, @type, @reverse (can only happen in specific cases when coming from parser), blank nodes with no @id
     // TODO: handle blank nodes generated for special predicates
     var predicateObjectList = [];
-    var rest = [];
     for (var key in jsonld)
     {
         if (key !== '@id' && key !== '@graph' && key !== '@context' && key !== '@list')
@@ -79,6 +84,8 @@ JSONLDParser.prototype._parse = function (jsonld, context, graphList, root, igno
             var predicate = this._URIfix(key, context);
             if (key === '@type')
                 predicate = 'a';
+            else if (key === 'log:implies')
+                predicate = '=>';
 
             if (!_.isArray(val))
                 val = [val];
@@ -87,12 +94,6 @@ JSONLDParser.prototype._parse = function (jsonld, context, graphList, root, igno
             for (var i = 0; i < val.length; ++i)
             {
                 var object = this._parse(val[i], context, graphList);
-                if (val[i]['@id'] && Object.keys(val[i]).length > 1)
-                {
-                    for (var j = 0; j < object.length; ++j)
-                        graphList.push(object[j]);
-                    object = this._URIfix(val[i]['@id'], context);
-                }
                 if (predicate === 'a')
                     object = this._URIfix(object, context);
                 objects.push(object);
@@ -101,22 +102,27 @@ JSONLDParser.prototype._parse = function (jsonld, context, graphList, root, igno
         }
     }
     // TODO: handle triples that only have a subject without predicate/object
-    if (predicateObjectList.length > 0)
+    if (id)
     {
-        if (id)
-            graphList.push(format('%s %s', id, predicateObjectList.join(' ; ')));
-        else
-            strings.push(format('[ %s ]', predicateObjectList.join(' ; '))); // TODO: find out when I need a dot here
+        if (predicateObjectList.length > 0)
+            graphList.push(format('%s %s . ', id, predicateObjectList.join(' ; ')));
+        else if (root)
+        {
+            // special case for the graph in the root, since the last element will already have the dot
+            if (ignoreGraph)
+                graphList.push(id);
+            else
+                graphList.push(format('%s . ', id));
+        }
     }
-    strings.push(id);
+    else
+    {
+        id = format('[ %s ]', predicateObjectList.join(' ; '));
+        if (root)
+            graphList.push(format('%s . ', id));
+    }
 
-    //if (root)
-        //strings = [strings.join(' . ') + ' . '];
-
-    // handle context after the joining
-    //strings = contextStrings.concat(strings);
-
-    return strings;
+    return id;
 };
 
 JSONLDParser.prototype._URIfix = function (id, context)
