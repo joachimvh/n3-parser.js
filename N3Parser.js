@@ -125,6 +125,11 @@ N3Parser.prototype._replaceStringLiteral = function (literal)
     var lang = N3Parser._langRegex.exec(literal);
 
     str = str[0].substring(1, str[0].length-1);
+    var quote = str[0];
+    // change triple quotes to single quotes
+    if (str[1] === quote)
+        str = str.substring(2, str.length-2);
+
     type = type && type[0].substring(2);
     if (type && type[0] === '<')
         type = type.substring(1, type.length-1);
@@ -631,7 +636,7 @@ module.exports = N3Parser;
 // :a :b :c.a:a :b :c.
 // :a :b :5.E3:a :b :c.
 var parser = new N3Parser();
-//var jsonld = parser.parse(':a :b "c\n\\"d"@nl-de.');
+var jsonld = parser.parse(':a :b "c\\"d"@nl-de.');
 //var jsonld = parser.parse(':Plato :says { :Socrates :is :mortal }.');
 //var jsonld = parser.parse('{ :Plato :is :immortal } :says { :Socrates :is { :person :is :mortal } . :Donald a :Duck }.');
 //parser.parse('[:a :b]^<test> [:c :d]!<test2> [:e :f]!<test3>.');
@@ -640,8 +645,8 @@ var parser = new N3Parser();
 //var jsonld = parser.parse('@prefix gr: <http://purl.org/goodrelations/v1#> . <http://www.acme.com/#store> a gr:Location; gr:hasOpeningHoursSpecification [ a gr:OpeningHoursSpecification; gr:opens "08:00:00"; gr:closes "20:00:00"; gr:hasOpeningHoursDayOfWeek gr:Friday, gr:Monday, gr:Thursday, gr:Tuesday, gr:Wednesday ]; gr:name "Hepp\'s Happy Burger Restaurant" .');
 //parser.parse(':a :b :c. :c :d :e.');
 
-var fs = require('fs');
-var data = fs.readFileSync('n3/secondUseCase/proof.n3', 'utf8');
+//var fs = require('fs');
+//var data = fs.readFileSync('n3/secondUseCase/proof.n3', 'utf8');
 //var jsonld = parser.parse(data);
 
 var JSONLDParser = require('./JSONLDParser');

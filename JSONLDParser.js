@@ -33,6 +33,7 @@ JSONLDParser.prototype._parse = function (jsonld, context, graphList, root, igno
         jsonld = {'@value': jsonld};
     if (jsonld['@value'])
     {
+        // TODO: possible that string is not escaped correctly
         var result = format('"%s"', jsonld['@value']);
         // add extra quotes for multiline strings
         if (result.indexOf('\n') >= 0 || result.indexOf('\r') >= 0)
