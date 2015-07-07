@@ -34,7 +34,8 @@ JSONLDParser.prototype._parse = function (jsonld, context, graphList, root, igno
     if (jsonld['@value'])
     {
         // TODO: possible that string is not escaped correctly
-        var result = format('"%s"', jsonld['@value']);
+        var result = JSON.stringify(jsonld['@value']); // format('"%s"', jsonld['@value']);
+        // TODO: extra quotes will never be reached because of stringify. Is this a problem?
         // add extra quotes for multiline strings
         if (result.indexOf('\n') >= 0 || result.indexOf('\r') >= 0)
             result = format('""%s""', result);

@@ -7,6 +7,7 @@ var uuid = require('node-uuid');
 
 function N3Parser () {}
 
+// TODO: check up what reserver escapes are supposed to do http://www.w3.org/TR/turtle/#sec-escapes
 // TODO: 32 bit unicode (use something like http://apps.timwhitlock.info/js/regex# ? or use xregexp with https://gist.github.com/slevithan/2630353 )
 N3Parser._PN_CHARS_BASE = /[A-Z_a-z\u00c0-\u00d6\u00d8-\u00f6\u00f8-\u02ff\u0370-\u037d\u037f-\u1fff\u200c-\u200d\u2070-\u218f\u2c00-\u2fef\u3001-\ud7ff\uf900-\ufdcf\ufdf0-\ufffd]/g;
 N3Parser._PN_CHARS_U = new RegExp('(?:' + N3Parser._PN_CHARS_BASE.source + '|_)');
@@ -44,11 +45,11 @@ N3Parser.prototype.parse = function (n3String)
 
     var replacementMap = {idx: 0};
     var valueMap = {};
-    n3String = this._replaceMatches(n3String, N3Parser._literalRegex, replacementMap, valueMap, this._replaceStringLiteral);
+    n3String = this._replaceMatches(n3String, N3Parser._literalRegex, replacementMap, valueMap, this._replaceStringLiteral.bind(this));
     n3String = this._replaceMatches(n3String, N3Parser._numericalRegex, replacementMap, valueMap, parseFloat);
     var literalKeys = Object.keys(valueMap);
-    n3String = this._replaceMatches(n3String, N3Parser._iriRegex, replacementMap, valueMap, this._replaceIRI);
-    n3String = this._replaceMatches(n3String, N3Parser._prefixIRI, replacementMap, valueMap, this._replaceIRI);
+    n3String = this._replaceMatches(n3String, N3Parser._iriRegex, replacementMap, valueMap, this._replaceIRI.bind(this));
+    n3String = this._replaceMatches(n3String, N3Parser._prefixIRI, replacementMap, valueMap, this._replaceIRI.bind(this));
     //console.log(n3String);
 
     var tokens = n3String.split(/\s+|([;.,{}[\]()!^])|(<?=>?)/).filter(Boolean); // splits and removes empty elements
@@ -97,11 +98,11 @@ N3Parser.prototype._replaceMatches = function (string, regex, map, valueMap, cal
         }
 
         if (callback)
-            callback(matchString);
+            matchString = callback(matchString);
         if (!map[matchString])
         {
             map[matchString] = '%' + ++map.idx;
-            valueMap[map[matchString]] = callback ? callback(matchString) : matchString;
+            valueMap[map[matchString]] = matchString;
         }
 
         stringParts.push(string.substr(match.idx + match.length));
@@ -129,6 +130,8 @@ N3Parser.prototype._replaceStringLiteral = function (literal)
     // change triple quotes to single quotes
     if (str[1] === quote)
         str = str.substring(2, str.length-2);
+    str = this._numericEscape(this._stringEscape(str));
+    console.log(str);
 
     type = type && type[0].substring(2);
     if (type && type[0] === '<')
@@ -145,9 +148,44 @@ N3Parser.prototype._replaceStringLiteral = function (literal)
 N3Parser.prototype._replaceIRI = function (iri)
 {
     if (iri[0] === '<')
-        iri = iri.substring(1, iri.length-1);
+        iri = this._numericEscape(iri.substring(1, iri.length-1));
     return iri;
 };
+
+// http://www.w3.org/TR/turtle/#sec-escapes
+N3Parser.prototype._stringEscape = function (str)
+{
+    var regex = /((?:\\\\)*)\\([tbnrf"'\\])/g;
+    return str.replace(regex, function (match, p1, p2)
+    {
+        var slashes = p1.substr(0, p1.length/2);
+        var c;
+        switch (p2)
+        {
+            case 't': c = '\t'; break;
+            case 'b': c = '\b'; break;
+            case 'n': c = '\n'; break;
+            case 'r': c = '\r'; break;
+            case 'f': c = '\f'; break;
+            case '"':
+            case "'":
+            case '\\': c = p2; break;
+            default: c = '';
+        }
+        return slashes + c;
+    });
+};
+
+N3Parser.prototype._numericEscape = function (str)
+{
+    var regex = /\\[uU]([A-fa-f0-9]{4,6})/g;
+    return str.replace(regex, function (match, unicode)
+    {
+        return String.fromCharCode(unicode);
+    });
+};
+
+// TODO: reserved escape
 
 N3Parser.prototype._revertMatches = function (jsonld, invertedMap, baseURI)
 {
@@ -635,8 +673,8 @@ module.exports = N3Parser;
 
 // :a :b :c.a:a :b :c.
 // :a :b :5.E3:a :b :c.
-var parser = new N3Parser();
-var jsonld = parser.parse(':a :b "c\\"d"@nl-de.');
+//var parser = new N3Parser();
+//var jsonld = parser.parse(':a :b "a\n\rb\\"c"@nl-de.');
 //var jsonld = parser.parse(':Plato :says { :Socrates :is :mortal }.');
 //var jsonld = parser.parse('{ :Plato :is :immortal } :says { :Socrates :is { :person :is :mortal } . :Donald a :Duck }.');
 //parser.parse('[:a :b]^<test> [:c :d]!<test2> [:e :f]!<test3>.');
@@ -649,6 +687,6 @@ var jsonld = parser.parse(':a :b "c\\"d"@nl-de.');
 //var data = fs.readFileSync('n3/secondUseCase/proof.n3', 'utf8');
 //var jsonld = parser.parse(data);
 
-var JSONLDParser = require('./JSONLDParser');
-var jp = new JSONLDParser();
+//var JSONLDParser = require('./JSONLDParser');
+//var jp = new JSONLDParser();
 //console.log(jp.parse(jsonld));
