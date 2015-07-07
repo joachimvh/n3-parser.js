@@ -131,7 +131,6 @@ N3Parser.prototype._replaceStringLiteral = function (literal)
     if (str[1] === quote)
         str = str.substring(2, str.length-2);
     str = this._numericEscape(this._stringEscape(str));
-    console.log(str);
 
     type = type && type[0].substring(2);
     if (type && type[0] === '<')
