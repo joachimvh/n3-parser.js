@@ -251,6 +251,7 @@ N3Parser.prototype._updatePathNodes = function (jsonld, parent)
     return parentChanged;
 };
 
+// TODO: should take graph scoping into account
 N3Parser.prototype._simplification = function (jsonld, literalKeys, orderedList)
 {
 
