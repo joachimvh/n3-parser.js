@@ -332,14 +332,14 @@ N3Parser.prototype._unFlatten = function (jsonld)
             {
                 // TODO: 'var:' are also blank nodes
                 _.extend(references[key][0], roots[key]); // we actually want lodash extend functionality here to not duplicate things like @id
-                if (key.substr(0, 2) === '_:')
+                if (key.substr(0, 2) === '_:' || key.substr(0, 4) === 'var:')
                     delete references[key][0]['@id']; // deleting the id's for now so JSONLDParser gives nicer N3 output
                 jsonld['@graph'] = _.without(jsonld['@graph'], roots[key]);
             }
         }
         else
         {
-            if (key.substr(0, 2) === '_:')
+            if (key.substr(0, 2) === '_:' || key.substr(0, 4) === 'var:')
                 delete roots[key]['@id']; // deleting the id's for now so JSONLDParser gives nicer N3 output
         }
     }
