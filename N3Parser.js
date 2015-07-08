@@ -330,6 +330,7 @@ N3Parser.prototype._unFlatten = function (jsonld)
         {
             if (references[key].length === 1 && references[key][0])
             {
+                // TODO: 'var:' are also blank nodes
                 _.extend(references[key][0], roots[key]); // we actually want lodash extend functionality here to not duplicate things like @id
                 if (key.substr(0, 2) === '_:')
                     delete references[key][0]['@id']; // deleting the id's for now so JSONLDParser gives nicer N3 output
