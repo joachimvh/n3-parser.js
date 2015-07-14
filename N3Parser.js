@@ -69,7 +69,6 @@ N3Parser.prototype.parse = function (n3String)
         jsonld = this._extend(jsonld, child);
     }
 
-    //console.log(JSON.stringify(jsonld, null, 4));
     return jsonld;
 };
 
@@ -307,8 +306,12 @@ N3Parser.prototype._simplification = function (jsonld, literalKeys, orderedList)
 };
 
 // TODO: does this still belong in this class?
-N3Parser.prototype._unFlatten = function (jsonld)
+N3Parser.prototype._unFlatten = function (jsonld, context)
 {
+    // TODO: need to keep this consistent for subgraphs
+    if (!context && jsonld['@context'])
+        context = jsonld['@context'];
+
     // there is only 1 root node so nothing will change
     if (!jsonld['@graph'])
         return jsonld;
@@ -326,21 +329,28 @@ N3Parser.prototype._unFlatten = function (jsonld)
     // TODO: be careful of loops in triple data
     for (var key in roots)
     {
+        var colonIdx = key.indexOf(':');
+        var del = false;
+        if (colonIdx >= 0)
+        {
+            var prefix = key.substring(0, colonIdx);
+            if (prefix === '_' || (context[prefix] && _.contains(context[prefix], '.well-known')))
+                del = true;
+        }
+
         if (references[key])
         {
             if (references[key].length === 1 && references[key][0])
             {
-                // TODO: 'var:' are also blank nodes
                 _.extend(references[key][0], roots[key]); // we actually want lodash extend functionality here to not duplicate things like @id
-                if (key.substr(0, 2) === '_:' || key.substr(0, 4) === 'var:')
+                if (del)
                     delete references[key][0]['@id']; // deleting the id's for now so JSONLDParser gives nicer N3 output
                 jsonld['@graph'] = _.without(jsonld['@graph'], roots[key]);
             }
         }
-        else
+        else if (del)
         {
-            if (key.substr(0, 2) === '_:' || key.substr(0, 4) === 'var:')
-                delete roots[key]['@id']; // deleting the id's for now so JSONLDParser gives nicer N3 output
+            delete roots[key]['@id']; // deleting the id's for now so JSONLDParser gives nicer N3 output
         }
     }
     return jsonld;
