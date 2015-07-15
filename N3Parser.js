@@ -56,7 +56,6 @@ N3Parser.prototype.parse = function (n3String)
     var jsonld = this._statementsOptional(tokens);
     this._updatePathNodes(jsonld); // changes in place
 
-    // TODO: unflatten
     jsonld = this._simplification(jsonld, literalKeys);
     jsonld = this._revertMatches(jsonld, valueMap);
     this._unFlatten(jsonld); // edits in place
@@ -253,7 +252,6 @@ N3Parser.prototype._updatePathNodes = function (jsonld, parent)
 // TODO: should take graph scoping into account
 N3Parser.prototype._simplification = function (jsonld, literalKeys, orderedList)
 {
-
     if (_.isString(jsonld))
         return jsonld;
     if (_.isArray(jsonld))
@@ -330,25 +328,19 @@ N3Parser.prototype._unFlatten = function (jsonld, context)
     for (var key in roots)
     {
         var colonIdx = key.indexOf(':');
-        var del = false;
-        if (colonIdx >= 0)
-        {
-            var prefix = key.substring(0, colonIdx);
-            if (prefix === '_' || (context[prefix] && _.contains(context[prefix], '.well-known')))
-                del = true;
-        }
+        var prefix = colonIdx >= 0 ? key.substring(0, colonIdx) : null;
 
         if (references[key])
         {
             if (references[key].length === 1 && references[key][0])
             {
                 _.extend(references[key][0], roots[key]); // we actually want lodash extend functionality here to not duplicate things like @id
-                if (del)
+                if (prefix && prefix === '_')
                     delete references[key][0]['@id']; // deleting the id's for now so JSONLDParser gives nicer N3 output
                 jsonld['@graph'] = _.without(jsonld['@graph'], roots[key]);
             }
         }
-        else if (del)
+        else if (prefix && prefix === '_')
         {
             delete roots[key]['@id']; // deleting the id's for now so JSONLDParser gives nicer N3 output
         }
