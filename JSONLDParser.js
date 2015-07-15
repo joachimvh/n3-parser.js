@@ -4,18 +4,21 @@
 
 var _ = require('lodash');
 var format = require('util').format;
+var N3Parser = require('./N3Parser');
 
 function JSONLDParser () {}
+
+JSONLDParser.suffixTest = new RegExp('^' + N3Parser._suffix.source + '$');
 
 // TODO: currently only focusing on JSON-LD that can be generated with N3Parser.js
 // TODO: indentation
 
-JSONLDParser.prototype.parse = function (jsonld)
+JSONLDParser.prototype.parse = function (jsonld, baseURI)
 {
     // TODO: not sure if this will never give issues
     var ignoreGraph = _.every(jsonld, function (val, key) { return key === '@context' || key === '@graph'; });
     var graphList = [];
-    var id = this._parse(jsonld, null, graphList, true, ignoreGraph);
+    var id = this._parse(jsonld, baseURI, null, graphList, true, ignoreGraph);
     // TODO: not sure about the output yet
     if (graphList.length > 0)
         return graphList.join('');
@@ -23,7 +26,7 @@ JSONLDParser.prototype.parse = function (jsonld)
         return format('%s .', id); // TODO: will this ever happen?
 };
 
-JSONLDParser.prototype._parse = function (jsonld, context, graphList, root, ignoreGraph)
+JSONLDParser.prototype._parse = function (jsonld, baseURI, context, graphList, root, ignoreGraph)
 {
     // TODO: handle quotes(+escape)/language/datatype
     if (_.isNumber(jsonld))
@@ -45,50 +48,44 @@ JSONLDParser.prototype._parse = function (jsonld, context, graphList, root, igno
         return result;
     }
 
-    // TODO: flatten might break things here
-    // TODO: should make sure this never triggers and always gets caught on a higher level?
-    if (_.isArray(jsonld))
-    {
-        throw 'should not happen anymore';
-        //return _.flatten(jsonld.map(function (child) { return this._parse(child, context, graphList);}, this));
-    }
-
     if (Object.keys(jsonld).length === 0)
         return '[]';
 
     context = context || {'_':'_'};
     // TODO: what if there is context without a graph?
+    // TODO: strip unused prefixes
     if (jsonld['@context'])
     {
         context = _.extend({}, context);
         for (var key in jsonld['@context'])
         {
             var val = jsonld['@context'][key];
-            if (key === '@vocab' || key === '@base')
-                key = '';
             graphList.push(format('PREFIX %s: <%s>\n', key, val));
             context[key] = val;
+        }
+        if (!context[''] && baseURI)
+        {
+            graphList.push(format('PREFIX : <%s>\n', baseURI));
+            context[''] = baseURI;
         }
     }
     // TODO: shouldn't overwrite id if it already has a value
     var id = jsonld['@id'] && this._URIfix(jsonld['@id'], context);
     if (jsonld['@graph'])
     {
-        // TODO: how to handle prefixes? this would place dots after them
         var localList = [];
-        var childIDs = jsonld['@graph'].map(function (child) { return this._parse(child, context, localList, true); }, this);
+        var childIDs = jsonld['@graph'].map(function (child) { return this._parse(child, baseURI, context, localList, true); }, this);
         id = format(ignoreGraph ? '%s' : '{ %s }', localList.join(' '));
     }
 
-    // TODO: this is wrong, list might contain triples that need to be put somewhere else
     if (jsonld['@list'])
-        id = format('( %s )', jsonld['@list'].map(function (child) { return this._parse(child, context, graphList);}, this).join(' '));
+        id = format('( %s )', jsonld['@list'].map(function (child) { return this._parse(child, baseURI, context, graphList);}, this).join(' '));
 
     // TODO: context is being ignored here
     if (jsonld['@forAll'])
-        return format('@forAll %s .', jsonld['@forAll'].map(function (child) { return this._parse(child, context, graphList);}, this).join(' , '));
+        return format('@forAll %s .', jsonld['@forAll'].map(function (child) { return this._parse(child, baseURI, context, graphList);}, this).join(' , '));
     if (jsonld['@forSome'])
-        return format('@forSome %s .', jsonld['@forAll'].map(function (child) { return this._parse(child, context, graphList);}, this).join(' , '));
+        return format('@forSome %s .', jsonld['@forAll'].map(function (child) { return this._parse(child, baseURI, context, graphList);}, this).join(' , '));
 
     // TODO: @reverse (can only happen in specific cases when coming from parser)
     // TODO: handle blank nodes generated for special predicates
@@ -113,9 +110,9 @@ JSONLDParser.prototype._parse = function (jsonld, context, graphList, root, igno
                 var object;
                 // special case since these don't use @id blocks
                 if (predicate === 'a')
-                    object = val[i]
+                    object = val[i];
                 else
-                    object = this._parse(val[i], context, graphList);
+                    object = this._parse(val[i], baseURI, context, graphList);
                 if (predicate === 'a')
                     object = this._URIfix(object, context);
                 objects.push(object);
@@ -153,12 +150,20 @@ JSONLDParser.prototype._URIfix = function (id, context)
     if (colonIdx >= 0)
     {
         var prefix = id.substring(0, colonIdx);
-        var suffix = id.substr(colonIdx+1);
+        var suffix = id.substring(colonIdx+1);
         if ((context[prefix] || prefix === '_') && suffix.substr(0, 2) !== '//')
             return format('%s:%s', prefix, suffix);
     }
-    //else
-    //    return format(':%s', id);
+    for (var prefix in context)
+    {
+        var namespace = context[prefix];
+        if (_.startsWith(id, namespace))
+        {
+            var suffix = id.substring(namespace.length);
+            if (JSONLDParser.suffixTest.test(suffix))
+                return format('%s:%s', prefix, suffix);
+        }
+    }
 
     return format('<%s>', id);
 };

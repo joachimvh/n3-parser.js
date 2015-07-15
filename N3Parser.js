@@ -17,12 +17,12 @@ N3Parser._PLX = /(?:%[0-9a-fA-F]{2})|(?:\\[-_~.!$&'()*+,;=/?#@%])/g;
 N3Parser._prefix = new RegExp(
     N3Parser._PN_CHARS_U.source + '(?:(?:' + N3Parser._PN_CHARS.source + '|\\.)*' + N3Parser._PN_CHARS.source + ')?', 'g'
 );
-N3Parser._postfix = new RegExp(
+N3Parser._suffix = new RegExp(
     '(?:' + N3Parser._PN_CHARS_U.source + '|[:0-9]|' + N3Parser._PLX.source + ')' +
     '(?:(?:' + N3Parser._PN_CHARS.source + '|[.:]|' + N3Parser._PLX.source + ')*(?:' + N3Parser._PN_CHARS.source + '|:|' + N3Parser._PLX.source + '))?'
 );
 N3Parser._prefixIRI = new RegExp(
-    '(?:' + N3Parser._prefix.source + ')?:' + N3Parser._postfix.source, 'g'
+    '(?:' + N3Parser._prefix.source + ')?:' + N3Parser._suffix.source, 'g'
 );
 N3Parser._iriRegex = /<[^>]*>/g;
 // TODO: lookbefore to check if there was no # (xregexp can support lookbefore if necessary), also do multiple runs so literals in-between 'disappear'
@@ -193,7 +193,7 @@ N3Parser.prototype._revertMatches = function (jsonld, invertedMap, baseURI)
         if (jsonld[0] === '%')
         {
             var str = invertedMap[jsonld];
-            // TODO: current solution to not confuse JSONLDParser
+            // current solution to not confuse JSONLDParser ( the URI #lemma1 gets encoded as { '@id': '#lemma1' }, at that point there is no way to know if we need to add the base prefix or not )
             if (str[0] === ':')
                 str = baseURI + str.substring(1);
             return str;
@@ -205,7 +205,10 @@ N3Parser.prototype._revertMatches = function (jsonld, invertedMap, baseURI)
         return jsonld.map(function (thingy) { return this._revertMatches(thingy, invertedMap, baseURI); }, this);
 
     if (jsonld['@context'] && jsonld['@context']['@vocab'])
+    {
         baseURI = invertedMap[jsonld['@context']['@vocab']];
+        delete jsonld['@context']['@vocab']; // we need to delete @vocab since it is incorrect to take it into account, just used it to temporarily store the base uri
+    }
 
     var result = {};
     for (var key in jsonld)
@@ -249,7 +252,7 @@ N3Parser.prototype._updatePathNodes = function (jsonld, parent)
     return parentChanged;
 };
 
-// TODO: should take graph scoping into account
+// TODO: should take graph scoping into account (extra TODO: I forgot what I mean by this)
 N3Parser.prototype._simplification = function (jsonld, literalKeys, orderedList)
 {
     if (_.isString(jsonld))
@@ -304,12 +307,9 @@ N3Parser.prototype._simplification = function (jsonld, literalKeys, orderedList)
 };
 
 // TODO: does this still belong in this class?
-N3Parser.prototype._unFlatten = function (jsonld, context)
+// TODO: might give incorrect results with blank nodes in subgraphs
+N3Parser.prototype._unFlatten = function (jsonld)
 {
-    // TODO: need to keep this consistent for subgraphs
-    if (!context && jsonld['@context'])
-        context = jsonld['@context'];
-
     // there is only 1 root node so nothing will change
     if (!jsonld['@graph'])
         return jsonld;
@@ -455,7 +455,7 @@ N3Parser.prototype._declaration = function (tokens)
     {
         var prefix = tokens.shift();
         var uri = tokens.shift();
-        // TODO: this is actually not correct in the current implementation, should remove this (after revert strings dependency is removed)
+        // note that this @vocab needs to be deleted at a later stage since it is actually incorrect here (would allow for incorrect assumptions)
         if (prefix === ':')
             return { '@context': { '@vocab': uri}};
         else
