@@ -364,6 +364,10 @@ N3Parser.prototype._findReferences = function (jsonld, roots)
 
     for (var key in jsonld)
     {
+        // TODO: merging blank nodes with those in the response screws up the final JSON, not the best place to do it so we need an other fixer for this
+        // TODO: !!! this is actually not even a completely correct fix !!!
+        if (key === 'http:body' && Object.keys(jsonld[key]).length === 1 && jsonld[key]['@id'] && roots[jsonld[key]['@id']] && !roots[jsonld[key]['@id']]['http://f4w.restdesc.org/demo#contains'])
+            continue;
         result = this._extend(result, this._findReferences(jsonld[key], roots));
         if (roots[key])
             result = this._extend(result, _.object([key], [[undefined]])); // we need to count predicates also for correctness, but won't replace them
