@@ -60,7 +60,7 @@ N3Parser.prototype.parse = function (n3String)
     jsonld = this._revertMatches(jsonld, valueMap);
     this._unFlatten(jsonld); // edits in place
 
-    // default graph is not always necessary to indicate
+    // default graph is not necessary if there is only 1 root node
     if (jsonld['@graph'] && jsonld['@graph'].length === 1 && _.every(jsonld, function (val, key) { return key === '@context' || key === '@graph'; }))
     {
         var child = jsonld['@graph'][0];
@@ -310,10 +310,6 @@ N3Parser.prototype._simplification = function (jsonld, literalKeys, orderedList)
 // TODO: might give incorrect results with blank nodes in subgraphs
 N3Parser.prototype._unFlatten = function (jsonld)
 {
-    // there is only 1 root node so nothing will change
-    if (!jsonld['@graph'])
-        return jsonld;
-
     var roots = {};
 
     for (var i = 0; i < jsonld['@graph'].length; ++i)
@@ -323,7 +319,8 @@ N3Parser.prototype._unFlatten = function (jsonld)
             roots[node['@id']] = node;
     }
 
-    var references = this._findReferences(jsonld, roots);
+    // don't use jsonld itself or you will get a stack overflow
+    var references = this._findReferences(jsonld['@graph'], roots);
     // TODO: be careful of loops in triple data
     for (var key in roots)
     {
@@ -357,17 +354,21 @@ N3Parser.prototype._findReferences = function (jsonld, roots)
     if (_.isArray(jsonld))
         return jsonld.reduce(function (prev, val) { return self._extend(prev, self._findReferences(val, roots)); }, {});
 
+    // make sure we don't accidently merge graphs
+    if (jsonld['@graph'])
+    {
+        // unflatten the subgraph, but don't combine it with the given roots
+        jsonld['@graph'] = this._unFlatten(jsonld)['@graph'];
+        return {};
+    }
+
     var result = {};
     var id = jsonld['@id'];
     if (id && roots[id] && jsonld !== roots[id])
-        result[id] = (result[id] || []).concat([jsonld]);
+        result[id] = [jsonld];
 
     for (var key in jsonld)
     {
-        // TODO: merging blank nodes with those in the response screws up the final JSON, not the best place to do it so we need an other fixer for this
-        // TODO: !!! this is actually not even a completely correct fix !!!
-        if (key === 'http:body' && Object.keys(jsonld[key]).length === 1 && jsonld[key]['@id'] && roots[jsonld[key]['@id']] && !roots[jsonld[key]['@id']]['http://f4w.restdesc.org/demo#contains'])
-            continue;
         result = this._extend(result, this._findReferences(jsonld[key], roots));
         if (roots[key])
             result = this._extend(result, _.object([key], [[undefined]])); // we need to count predicates also for correctness, but won't replace them
