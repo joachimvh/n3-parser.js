@@ -310,6 +310,9 @@ N3Parser.prototype._simplification = function (jsonld, literalKeys, orderedList)
 // TODO: might give incorrect results with blank nodes in subgraphs
 N3Parser.prototype._unFlatten = function (jsonld)
 {
+    if (!jsonld['@graph'])
+        return jsonld;
+
     var roots = {};
 
     for (var i = 0; i < jsonld['@graph'].length; ++i)
