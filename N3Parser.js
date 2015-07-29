@@ -234,7 +234,6 @@ N3Parser.prototype._updatePathNodes = function (jsonld, parent)
     while (changed)
     {
         changed = false;
-        // TODO: no way to change parent? (will this ever be necessary? what would it mean?)
         if (_.isArray(jsonld))
             changed = _.some(jsonld, function (child) { return self._updatePathNodes(child, jsonld); });
 
@@ -254,7 +253,6 @@ N3Parser.prototype._updatePathNodes = function (jsonld, parent)
     return parentChanged;
 };
 
-// TODO: should take graph scoping into account (extra TODO: I forgot what I mean by this)
 N3Parser.prototype._simplification = function (jsonld, literalKeys, orderedList)
 {
     if (_.isString(jsonld))
@@ -309,7 +307,6 @@ N3Parser.prototype._simplification = function (jsonld, literalKeys, orderedList)
 };
 
 // TODO: does this still belong in this class?
-// TODO: might give incorrect results with blank nodes in subgraphs
 N3Parser.prototype._unFlatten = function (jsonld)
 {
     if (!jsonld['@graph'])
@@ -326,7 +323,6 @@ N3Parser.prototype._unFlatten = function (jsonld)
 
     // don't use jsonld itself or you will get a stack overflow
     var references = this._findReferences(jsonld['@graph'], roots);
-    // TODO: be careful of loops in triple data
     for (var key in roots)
     {
         var colonIdx = key.indexOf(':');
@@ -334,7 +330,7 @@ N3Parser.prototype._unFlatten = function (jsonld)
 
         if (references[key])
         {
-            if (references[key].length === 1 && references[key][0])
+            if (references[key].length === 1 && references[key][0] && !this._deepContains(roots[key], references[key][0]))
             {
                 _.extend(references[key][0], roots[key]); // we actually want lodash extend functionality here to not duplicate things like @id
                 if (prefix && prefix === '_')
@@ -348,6 +344,18 @@ N3Parser.prototype._unFlatten = function (jsonld)
         }
     }
     return jsonld;
+};
+
+// necessary to handle circular references
+N3Parser.prototype._deepContains = function (collection, element)
+{
+    if (_.isString(collection) || _.isNumber(collection))
+        return collection === element;
+
+    if (collection === element)
+        return true;
+
+    return _.some(collection, function (thingy) { return this._deepContains(thingy, element); }.bind(this));
 };
 
 N3Parser.prototype._findReferences = function (jsonld, roots)
@@ -687,6 +695,7 @@ module.exports = N3Parser;
 // :a :b :c.a:a :b :c.
 // :a :b :5.E3:a :b :c.
 //var parser = new N3Parser();
+//var jsonld = parser.parse(':a :b :c. :c :b :a.');
 //var jsonld = parser.parse('# comment " test \n <http://test#stuff> :b "str#ing". :a :b """line 1\n#line2\nline3""". # comment about this thing');
 //var jsonld = parser.parse(':a :b "a\n\rb\\"c"@nl-de.');
 //var jsonld = parser.parse(':Plato :says { :Socrates :is :mortal }.');
@@ -696,6 +705,7 @@ module.exports = N3Parser;
 //var jsonld = parser.parse(':a :b 5.E3.a:a :b :c.');
 //var jsonld = parser.parse('@prefix gr: <http://purl.org/goodrelations/v1#> . <http://www.acme.com/#store> a gr:Location; gr:hasOpeningHoursSpecification [ a gr:OpeningHoursSpecification; gr:opens "08:00:00"; gr:closes "20:00:00"; gr:hasOpeningHoursDayOfWeek gr:Friday, gr:Monday, gr:Thursday, gr:Tuesday, gr:Wednesday ]; gr:name "Hepp\'s Happy Burger Restaurant" .');
 //parser.parse(':a :b :c. :c :d :e.');
+//console.log(JSON.stringify(jsonld, null, 4));
 
 //var fs = require('fs');
 //var data = fs.readFileSync('n3/secondUseCase/proof.n3', 'utf8');
