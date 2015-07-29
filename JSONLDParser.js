@@ -6,7 +6,10 @@ var _ = require('lodash');
 var format = require('util').format;
 var N3Parser = require('./N3Parser');
 
-function JSONLDParser () {}
+function JSONLDParser (indent)
+{
+    this.indent = indent;
+}
 
 JSONLDParser.suffixTest = new RegExp('^' + N3Parser._suffix.source + '$');
 
@@ -75,11 +78,14 @@ JSONLDParser.prototype._parse = function (jsonld, baseURI, context, graphList, r
     {
         var localList = [];
         var childIDs = jsonld['@graph'].map(function (child) { return this._parse(child, baseURI, context, localList, true); }, this);
-        id = format(ignoreGraph ? '%s' : '{ %s }', localList.join(' '));
+        if (ignoreGraph)
+            id = localList.join('\n');
+        else
+            id = format('{\n%s\n}', this._shiftStrings(localList, 4).join('\n'));
     }
 
     if (jsonld['@list'])
-        id = format('( %s )', jsonld['@list'].map(function (child) { return this._parse(child, baseURI, context, graphList);}, this).join(' '));
+        id = format('(\n%s\n)', this._shiftStrings(jsonld['@list'].map(function (child) { return this._parse(child, baseURI, context, graphList);}, this), 4).join('\n'));
 
     // TODO: context is being ignored here
     if (jsonld['@forAll'])
@@ -117,14 +123,15 @@ JSONLDParser.prototype._parse = function (jsonld, baseURI, context, graphList, r
                     object = this._URIfix(object, context);
                 objects.push(object);
             }
-            predicateObjectList.push(format('%s %s', predicate, objects.join(' , ')));
+            predicateObjectList.push(format('%s %s', predicate, this._shiftStrings(objects, this._lastWidth(predicate) + 1, true).join(' ,\n')));
         }
     }
+
     // TODO: handle triples that only have a subject without predicate/object
     if (id)
     {
         if (predicateObjectList.length > 0)
-            graphList.push(format('%s %s . ', id, predicateObjectList.join(' ; ')));
+            graphList.push(format('%s %s . ', id, this._shiftStrings(predicateObjectList, this._lastWidth(id) + 1, true).join(' ;\n')));
         else if (root)
         {
             // special case for the graph in the root, since the last element will already have the dot
@@ -136,7 +143,7 @@ JSONLDParser.prototype._parse = function (jsonld, baseURI, context, graphList, r
     }
     else
     {
-        id = format('[ %s ]', predicateObjectList.join(' ; '));
+        id = format('[\n%s\n]', this._shiftStrings(predicateObjectList, 4).join(' ;\n'));
         if (root)
             graphList.push(format('%s . ', id));
     }
@@ -166,6 +173,37 @@ JSONLDParser.prototype._URIfix = function (id, context)
     }
 
     return format('<%s>', id);
+};
+
+JSONLDParser.prototype._shiftStrings = function (parts, level, ignoreFirst)
+{
+    if (!this.indent)
+        return parts;
+
+    return parts.map(function (part, idx)
+    {
+        return this._shiftStringBlock(part, level, ignoreFirst && idx === 0);
+    }.bind(this));
+};
+
+JSONLDParser.prototype._shiftStringBlock = function (block, level, ignoreFirst)
+{
+    if (!_.isString(block))
+        return block;
+    var parts = block.split('\n');
+    var pad = _.repeat(' ', level);
+    return (ignoreFirst ? '' : pad) + parts.join('\n' + pad);
+};
+
+JSONLDParser.prototype._blockWidth = function (block)
+{
+    return _.max(block.split('\n'), 'length').length;
+};
+
+JSONLDParser.prototype._lastWidth = function (block)
+{
+    var parts = block.split('\n');
+    return parts[parts.length-1].length;
 };
 
 module.exports = JSONLDParser;
