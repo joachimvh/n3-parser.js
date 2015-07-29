@@ -80,12 +80,20 @@ JSONLDParser.prototype._parse = function (jsonld, baseURI, context, graphList, r
         var childIDs = jsonld['@graph'].map(function (child) { return this._parse(child, baseURI, context, localList, true); }, this);
         if (ignoreGraph)
             id = localList.join('\n');
+        else if (localList.length === 0)
+            id = '{ }';
         else
-            id = format('{\n%s\n}', this._shiftStrings(localList, 4).join('\n'));
+            id = format('{ %s }', this._shiftStrings(localList, 2, true).join('\n'));
     }
 
     if (jsonld['@list'])
-        id = format('(\n%s\n)', this._shiftStrings(jsonld['@list'].map(function (child) { return this._parse(child, baseURI, context, graphList);}, this), 4).join('\n'));
+    {
+        var children = jsonld['@list'].map(function (child) { return this._parse(child, baseURI, context, graphList);}, this);
+        if (children.length === 0)
+            id = '( )';
+        else
+            id = format('( %s )', this._shiftStrings(children, 2, true).join('\n'));
+    }
 
     // TODO: context is being ignored here
     if (jsonld['@forAll'])
@@ -104,7 +112,7 @@ JSONLDParser.prototype._parse = function (jsonld, baseURI, context, graphList, r
             var predicate = this._URIfix(key, context);
             if (key === '@type')
                 predicate = 'a';
-            else if (key === 'log:implies')
+            else if (predicate === 'log:implies')
                 predicate = '=>';
 
             if (!_.isArray(val))
@@ -131,21 +139,21 @@ JSONLDParser.prototype._parse = function (jsonld, baseURI, context, graphList, r
     if (id)
     {
         if (predicateObjectList.length > 0)
-            graphList.push(format('%s %s . ', id, this._shiftStrings(predicateObjectList, this._lastWidth(id) + 1, true).join(' ;\n')));
+            graphList.push(format('%s %s .', id, this._shiftStrings(predicateObjectList, this._lastWidth(id) + 1, true).join(' ;\n')));
         else if (root)
         {
             // special case for the graph in the root, since the last element will already have the dot
             if (ignoreGraph)
                 graphList.push(id);
             else
-                graphList.push(format('%s . ', id));
+                graphList.push(format('%s .', id));
         }
     }
     else
     {
-        id = format('[\n%s\n]', this._shiftStrings(predicateObjectList, 4).join(' ;\n'));
+        id = format('[ %s ]', this._shiftStrings(predicateObjectList, 2, true).join(' ;\n'));
         if (root)
-            graphList.push(format('%s . ', id));
+            graphList.push(format('%s .', id));
     }
 
     return id;
@@ -153,6 +161,8 @@ JSONLDParser.prototype._parse = function (jsonld, baseURI, context, graphList, r
 
 JSONLDParser.prototype._URIfix = function (id, context)
 {
+    if (id[0] === '?')
+        return id;
     var colonIdx = id.indexOf(':');
     if (colonIdx >= 0)
     {
