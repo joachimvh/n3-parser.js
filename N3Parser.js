@@ -7,13 +7,13 @@ var uuid = require('node-uuid');
 
 function N3Parser () {}
 
-// TODO: check up what reserver escapes are supposed to do http://www.w3.org/TR/turtle/#sec-escapes
+// TODO: check up what reserved escapes are supposed to do http://www.w3.org/TR/turtle/#sec-escapes
 // TODO: 32 bit unicode (use something like http://apps.timwhitlock.info/js/regex# ? or use xregexp with https://gist.github.com/slevithan/2630353 )
 N3Parser._PN_CHARS_BASE = /[A-Z_a-z\u00c0-\u00d6\u00d8-\u00f6\u00f8-\u02ff\u0370-\u037d\u037f-\u1fff\u200c-\u200d\u2070-\u218f\u2c00-\u2fef\u3001-\ud7ff\uf900-\ufdcf\ufdf0-\ufffd]/g;
 N3Parser._PN_CHARS_U = new RegExp('(?:' + N3Parser._PN_CHARS_BASE.source + '|_)');
 N3Parser._PN_CHARS = new RegExp('(?:' + N3Parser._PN_CHARS_U.source + '|' + /[-0-9\u00b7\u0300-\u036f\u203f-\u2040]/.source + ')');
 N3Parser._PLX = /(?:%[0-9a-fA-F]{2})|(?:\\[-_~.!$&'()*+,;=/?#@%])/g;
-// TODO: using _U instead of _BASE to also match blank nodes
+// using _U instead of _BASE to also match blank nodes
 N3Parser._prefix = new RegExp(
     N3Parser._PN_CHARS_U.source + '(?:(?:' + N3Parser._PN_CHARS.source + '|\\.)*' + N3Parser._PN_CHARS.source + ')?', 'g'
 );
@@ -26,6 +26,7 @@ N3Parser._prefixIRI = new RegExp(
 );
 N3Parser._iriRegex = /<[^>]*>/g;
 // TODO: lookbefore to check if there was no # (xregexp can support lookbefore if necessary), also do multiple runs so literals in-between 'disappear'
+// TODO: can't do this since there might be a URI in the subject that contains a #
 N3Parser._stringRegex = /("|')(\1\1)?(?:[^]*?[^\\])??(?:\\\\)*\2\1/g;
 N3Parser._datatypeRegex = new RegExp(
     '\\^\\^(?:(?:' + N3Parser._iriRegex.source + ')|(?:' + N3Parser._prefixIRI.source + '))', 'g'
@@ -33,24 +34,26 @@ N3Parser._datatypeRegex = new RegExp(
 N3Parser._langRegex = /@[a-z]+(-[a-z0-9]+)*/g;
 N3Parser._literalRegex = new RegExp(
     N3Parser._stringRegex.source +
-    '((' + N3Parser._datatypeRegex.source + ')|(' + N3Parser._langRegex.source + '))?', 'g'
+    '((?:' + N3Parser._datatypeRegex.source + ')|(?:' + N3Parser._langRegex.source + '))?', 'g'
 );
 N3Parser._numericalRegex = /(?:[[{(.\s]|^)[-+]?(?:(?:(?:(?:[0-9]+\.?[0-9]*)|(?:\.[0-9]+))[eE][-+]?[0-9]+)|(?:[0-9]*(\.[0-9]+))|(?:[0-9]+))/g;
 
 // TODO: can't handle comments correctly yet
 N3Parser.prototype.parse = function (n3String)
 {
-    // clean up simple comments (doesn't handle inline comments and can be incorrect with multiline strings)
+    // remove simple comments ('m' is necessary to treat \n as the end of a match instead of only using the end of the string)
     n3String = n3String.replace(/^\s*#.*$/gm, '');
 
     var replacementMap = {idx: 0};
     var valueMap = {};
     n3String = this._replaceMatches(n3String, N3Parser._literalRegex, replacementMap, valueMap, this._replaceStringLiteral.bind(this));
-    n3String = this._replaceMatches(n3String, N3Parser._numericalRegex, replacementMap, valueMap, parseFloat);
+    n3String = this._replaceMatches(n3String, N3Parser._numericalRegex, replacementMap, valueMap, function (match) { match.jsonld = parseFloat(match[0]); return match; });
     var literalKeys = Object.keys(valueMap);
     n3String = this._replaceMatches(n3String, N3Parser._iriRegex, replacementMap, valueMap, this._replaceIRI.bind(this));
     n3String = this._replaceMatches(n3String, N3Parser._prefixIRI, replacementMap, valueMap, this._replaceIRI.bind(this));
-    //console.log(n3String);
+
+    // assume all remaining #'s belong to comments
+    n3String = n3String.replace(/#.*$/gm, '');
 
     var tokens = n3String.split(/\s+|([;.,{}[\]()!^])|(<?=>?)/).filter(Boolean); // splits and removes empty elements
     var jsonld = this._statementsOptional(tokens);
@@ -77,35 +80,32 @@ N3Parser.prototype._replaceMatches = function (string, regex, map, valueMap, cal
     var match;
     regex.lastIndex = 0;
     while (match = regex.exec(string))
-        matches.push({idx:match.index, length:match[0].length});
+        matches.push(match);
 
     var stringParts = [];
+    // we start in the back to make sure the indexes of the previous matches stay correct
     for (var i = matches.length-1; i >= 0; --i)
     {
         match = matches[i];
 
-        var matchString = string.substr(match.idx, match.length);
-
         // need to do check of first character since javascript doesn't have lookbehind regexes
         var pre = /^[[{(.\s]/;
-        if (pre.exec(matchString))
+        if (pre.exec(match[0]))
         {
-            matchString = matchString.substring(1);
-            match.idx++;
-            match.length--;
+            match[0] = match[0].substring(1);
+            match.index++;
         }
-
         if (callback)
-            matchString = callback(matchString);
-        if (!map[matchString])
+            match = callback(match);
+        if (!map[match[0]])
         {
-            map[matchString] = '%' + ++map.idx;
-            valueMap[map[matchString]] = matchString;
+            map[match[0]] = '%' + ++map.idx;
+            valueMap[map[match[0]]] = match.jsonld || match[0];
         }
 
-        stringParts.push(string.substr(match.idx + match.length));
-        stringParts.push(' ' + map[matchString] + ' '); // extra whitespace helps in parsing
-        string = string.substring(0, match.idx);
+        stringParts.push(string.substr(match.index + match[0].length));
+        stringParts.push(' ' + map[match[0]] + ' '); // extra whitespace helps in parsing
+        string = string.substring(0, match.index);
     }
     stringParts.push(string);
     stringParts.reverse();
@@ -113,20 +113,19 @@ N3Parser.prototype._replaceMatches = function (string, regex, map, valueMap, cal
     return stringParts.join('');
 };
 
-N3Parser.prototype._replaceStringLiteral = function (literal)
+N3Parser.prototype._replaceStringLiteral = function (match)
 {
     N3Parser._stringRegex.lastIndex = 0;
     N3Parser._datatypeRegex.lastIndex = 0;
     N3Parser._langRegex.lastIndex = 0;
 
-    var str = N3Parser._stringRegex.exec(literal);
-    var type = N3Parser._datatypeRegex.exec(literal);
-    var lang = N3Parser._langRegex.exec(literal);
+    var str = N3Parser._stringRegex.exec(match[0]);
+    var type = N3Parser._datatypeRegex.exec(match[0]);
+    var lang = N3Parser._langRegex.exec(match[0]);
 
     str = str[0].substring(1, str[0].length-1);
-    var quote = str[0];
     // change triple quotes to single quotes
-    if (str[1] === quote)
+    if (str[1] === match[1])
         str = str.substring(2, str.length-2);
     str = this._numericEscape(this._stringEscape(str));
 
@@ -135,18 +134,21 @@ N3Parser.prototype._replaceStringLiteral = function (literal)
         type = type.substring(1, type.length-1);
     lang = lang && lang[0].substring(1);
 
+    match.jsonld = str;
     if (type)
-        return { '@value': str, '@type': type};
+        match.jsonld = { '@value': str, '@type': type};
     if (lang)
-        return { '@value': str, '@language': lang};
-    return str;
+        match.jsonld = { '@value': str, '@language': lang};
+    return match;
 };
 
-N3Parser.prototype._replaceIRI = function (iri)
+N3Parser.prototype._replaceIRI = function (match)
 {
+    var iri = match[0];
     if (iri[0] === '<')
         iri = this._numericEscape(iri.substring(1, iri.length-1));
-    return iri;
+    match.jsonld = iri;
+    return match;
 };
 
 // http://www.w3.org/TR/turtle/#sec-escapes
@@ -685,6 +687,7 @@ module.exports = N3Parser;
 // :a :b :c.a:a :b :c.
 // :a :b :5.E3:a :b :c.
 //var parser = new N3Parser();
+//var jsonld = parser.parse('# comment " test \n <http://test#stuff> :b "str#ing". :a :b """line 1\n#line2\nline3""". # comment about this thing');
 //var jsonld = parser.parse(':a :b "a\n\rb\\"c"@nl-de.');
 //var jsonld = parser.parse(':Plato :says { :Socrates :is :mortal }.');
 //var jsonld = parser.parse('{ :Plato :is :immortal } :says { :Socrates :is { :person :is :mortal } . :Donald a :Duck }.');
