@@ -100,7 +100,7 @@ N3Parser.prototype._replaceMatches = function (string, regex, map, valueMap, cal
         if (!map[match[0]])
         {
             map[match[0]] = '%' + ++map.idx;
-            valueMap[map[match[0]]] = match.jsonld || match[0];
+            valueMap[map[match[0]]] = match.jsonld === undefined ? match[0] : match.jsonld; // 0 can be a correct value
         }
 
         stringParts.push(string.substr(match.index + match[0].length));
@@ -695,6 +695,7 @@ module.exports = N3Parser;
 // :a :b :c.a:a :b :c.
 // :a :b :5.E3:a :b :c.
 //var parser = new N3Parser();
+//var jsonld = parser.parse(':a :b 0, 1.');
 //var jsonld = parser.parse(':a :b :c. :c :b :a.');
 //var jsonld = parser.parse('# comment " test \n <http://test#stuff> :b "str#ing". :a :b """line 1\n#line2\nline3""". # comment about this thing');
 //var jsonld = parser.parse(':a :b "a\n\rb\\"c"@nl-de.');
