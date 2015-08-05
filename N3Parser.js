@@ -333,14 +333,14 @@ N3Parser.prototype._unFlatten = function (jsonld)
             if (references[key].length === 1 && references[key][0] && !this._deepContains(roots[key], references[key][0]))
             {
                 _.extend(references[key][0], roots[key]); // we actually want lodash extend functionality here to not duplicate things like @id
-                if (prefix && prefix === '_')
-                    delete references[key][0]['@id']; // deleting the id's for now so JSONLDParser gives nicer N3 output
+                //if (prefix && prefix === '_')
+                    //delete references[key][0]['@id']; // deleting the id's for now so JSONLDParser gives nicer N3 output
                 jsonld['@graph'] = _.without(jsonld['@graph'], roots[key]);
             }
         }
         else if (prefix && prefix === '_')
         {
-            delete roots[key]['@id']; // deleting the id's for now so JSONLDParser gives nicer N3 output
+            //delete roots[key]['@id']; // deleting the id's for now so JSONLDParser gives nicer N3 output
         }
     }
     return jsonld;
