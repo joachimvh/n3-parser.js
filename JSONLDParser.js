@@ -14,15 +14,12 @@ function JSONLDParser (indent)
 JSONLDParser.suffixTest = new RegExp('^' + N3Parser._suffix.source + '$');
 
 // TODO: currently only focusing on JSON-LD that can be generated with N3Parser.js
-// TODO: indentation
 
 JSONLDParser.prototype.parse = function (jsonld, baseURI)
 {
-    // TODO: not sure if this will never give issues
     var ignoreGraph = _.every(jsonld, function (val, key) { return key === '@context' || key === '@graph'; });
     var graphList = [];
     var id = this._parse(jsonld, baseURI, null, graphList, true, ignoreGraph);
-    // TODO: not sure about the output yet
     if (graphList.length > 0)
         return graphList.join('');
     else
@@ -31,7 +28,7 @@ JSONLDParser.prototype.parse = function (jsonld, baseURI)
 
 JSONLDParser.prototype._parse = function (jsonld, baseURI, context, graphList, root, ignoreGraph)
 {
-    // TODO: handle quotes(+escape)/language/datatype
+    // TODO: language/datatype
     if (_.isNumber(jsonld))
         return jsonld;
 
@@ -40,10 +37,7 @@ JSONLDParser.prototype._parse = function (jsonld, baseURI, context, graphList, r
     if (jsonld['@value'])
     {
         var result = JSON.stringify(jsonld['@value']); // format('"%s"', jsonld['@value']);
-        // TODO: extra quotes will never be reached because of stringify. Is this a problem?
-        // add extra quotes for multiline strings
-        if (result.indexOf('\n') >= 0 || result.indexOf('\r') >= 0)
-            result = format('""%s""', result);
+        // won't have triple quote strings since JSON converts newlines to \n
         if (jsonld['@language'])
             result = format('%s@%s', result, jsonld['@language']);
         if (jsonld['@type'])
@@ -56,7 +50,6 @@ JSONLDParser.prototype._parse = function (jsonld, baseURI, context, graphList, r
 
     context = context || {'_':'_'};
     // TODO: what if there is context without a graph?
-    // TODO: strip unused prefixes
     if (jsonld['@context'])
     {
         context = _.extend({}, context);
@@ -135,7 +128,6 @@ JSONLDParser.prototype._parse = function (jsonld, baseURI, context, graphList, r
         }
     }
 
-    // TODO: handle triples that only have a subject without predicate/object
     if (id)
     {
         if (predicateObjectList.length > 0)

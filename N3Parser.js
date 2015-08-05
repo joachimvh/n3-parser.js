@@ -530,7 +530,6 @@ N3Parser.prototype._expression = function (tokens)
 {
     var pathitem = this._pathitem(tokens); // x
     pathitem = _.isString(pathitem) ? { '@id': pathitem} : pathitem;
-    // TODO: problem because there is a big difference between predicates and the rest?
     if (tokens[0] === '!')
     {
         // x!p means [ is p of x ]
