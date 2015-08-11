@@ -46,11 +46,15 @@ N3Parser.prototype.parse = function (n3String)
 
     var replacementMap = {idx: 0};
     var valueMap = {};
-    n3String = this._replaceMatches(n3String, N3Parser._literalRegex, replacementMap, valueMap, this._replaceStringLiteral.bind(this));
-    n3String = this._replaceMatches(n3String, N3Parser._numericalRegex, replacementMap, valueMap, function (match) { match.jsonld = parseFloat(match[0]); return match; });
-    var literalKeys = Object.keys(valueMap);
+    var literalMap = {};
+    n3String = this._replaceMatches(n3String, N3Parser._literalRegex, replacementMap, literalMap, this._replaceStringLiteral.bind(this));
     n3String = this._replaceMatches(n3String, N3Parser._iriRegex, replacementMap, valueMap, this._replaceIRI.bind(this));
     n3String = this._replaceMatches(n3String, N3Parser._prefixIRI, replacementMap, valueMap, this._replaceIRI.bind(this));
+    n3String = this._replaceMatches(n3String, N3Parser._numericalRegex, replacementMap, literalMap, function (match) { match.jsonld = parseFloat(match[0]); return match; });
+
+    valueMap = _.extend(valueMap, literalMap);
+
+    var literalKeys = Object.keys(literalMap);
 
     // assume all remaining #'s belong to comments
     n3String = n3String.replace(/#.*$/gm, '');
