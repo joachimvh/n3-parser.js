@@ -47,6 +47,7 @@ N3Parser.prototype.parse = function (n3String)
     var replacementMap = {idx: 0};
     var valueMap = {};
     var literalMap = {};
+    // TODO: do the regexes at the same time and use the first one (so we know if we have a comment or a literal)
     n3String = this._replaceMatches(n3String, N3Parser._literalRegex, replacementMap, literalMap, this._replaceStringLiteral.bind(this));
     n3String = this._replaceMatches(n3String, N3Parser._iriRegex, replacementMap, valueMap, this._replaceIRI.bind(this));
     n3String = this._replaceMatches(n3String, N3Parser._prefixIRI, replacementMap, valueMap, this._replaceIRI.bind(this));
