@@ -602,7 +602,7 @@ N3Parser.prototype._formulacontent = function (tokens)
 
 N3Parser.prototype._propertylist = function (tokens)
 {
-    if (tokens.length === 0 || tokens[0] === ']' || tokens[0] === '.')
+    if (tokens.length === 0 || tokens[0] === ']' || tokens[0] === '.' || tokens[0] === '}' || tokens[0] === ')')
         return {};
 
     var predicate = this._predicate(tokens);
@@ -699,6 +699,8 @@ module.exports = N3Parser;
 // :a :b :c.a:a :b :c.
 // :a :b :5.E3:a :b :c.
 //var parser = new N3Parser();
+//var jsonld = parser.parse(':a :tolerances ( {[ :min :min1; :max :max1 ]} {[ :min :min2; :max :max2 ]} ).');
+//var jsonld = parser.parse('{ :a }.');
 //var jsonld = parser.parse(':a :b 0, 1.');
 //var jsonld = parser.parse(':a :b :c. :c :b :a.');
 //var jsonld = parser.parse('# comment " test \n <http://test#stuff> :b "str#ing". :a :b """line 1\n#line2\nline3""". # comment about this thing');
