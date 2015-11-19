@@ -699,6 +699,7 @@ module.exports = N3Parser;
 // :a :b :c.a:a :b :c.
 // :a :b :5.E3:a :b :c.
 //var parser = new N3Parser();
+//var jsonld = parser.parse('5 a :id.');
 //var jsonld = parser.parse(':a :tolerances ( {[ :min :min1; :max :max1 ]} {[ :min :min2; :max :max2 ]} ).');
 //var jsonld = parser.parse('{ :a }.');
 //var jsonld = parser.parse(':a :b 0, 1.');

@@ -153,8 +153,9 @@ JSONLDParser.prototype._parse = function (jsonld, baseURI, context, graphList, r
 
 JSONLDParser.prototype._URIfix = function (id, context)
 {
-    if (id[0] === '?')
-        return id;
+    // TODO: how to handle literal subjects?
+    if (id[0] === '?' || _.isNumber(id))
+        return id + '';
     var colonIdx = id.indexOf(':');
     if (colonIdx >= 0)
     {
