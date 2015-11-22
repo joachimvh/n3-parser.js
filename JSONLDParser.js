@@ -29,7 +29,7 @@ JSONLDParser.prototype.parse = function (jsonld, baseURI)
 JSONLDParser.prototype._parse = function (jsonld, baseURI, context, graphList, root, ignoreGraph)
 {
     // TODO: language/datatype
-    if (_.isNumber(jsonld))
+    if (_.isNumber(jsonld) || _.isBoolean(jsonld))
         return jsonld;
 
     if (_.isString(jsonld))
