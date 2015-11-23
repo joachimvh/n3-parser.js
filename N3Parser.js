@@ -37,6 +37,7 @@ N3Parser._literalRegex = new RegExp(
     '((?:' + N3Parser._datatypeRegex.source + ')|(?:' + N3Parser._langRegex.source + '))?', 'g'
 );
 N3Parser._numericalRegex = /(?:[[{(.\s]|^)[-+]?(?:(?:(?:(?:[0-9]+\.?[0-9]*)|(?:\.[0-9]+))[eE][-+]?[0-9]+)|(?:[0-9]*(\.[0-9]+))|(?:[0-9]+))/g;
+N3Parser._booleanRegex = /(?:true)|(?:false)/g;
 
 // TODO: can't handle comments correctly yet
 N3Parser.prototype.parse = function (n3String)
@@ -52,6 +53,7 @@ N3Parser.prototype.parse = function (n3String)
     n3String = this._replaceMatches(n3String, N3Parser._iriRegex, replacementMap, valueMap, this._replaceIRI.bind(this));
     n3String = this._replaceMatches(n3String, N3Parser._prefixIRI, replacementMap, valueMap, this._replaceIRI.bind(this));
     n3String = this._replaceMatches(n3String, N3Parser._numericalRegex, replacementMap, literalMap, function (match) { match.jsonld = parseFloat(match[0]); return match; });
+    n3String = this._replaceMatches(n3String, N3Parser._booleanRegex, replacementMap, literalMap, function (match) { match.jsonld = match[0] === 'true'; return match; });
 
     valueMap = _.extend(valueMap, literalMap);
 
@@ -354,7 +356,7 @@ N3Parser.prototype._unFlatten = function (jsonld)
 // necessary to handle circular references
 N3Parser.prototype._deepContains = function (collection, element)
 {
-    if (_.isString(collection) || _.isNumber(collection))
+    if (_.isString(collection) || _.isNumber(collection) || _.isBoolean(collection))
         return collection === element;
 
     if (collection === element)
@@ -424,11 +426,11 @@ N3Parser.prototype._extend = function (objectA, objectB, inPlace)
     for (var i = 0; i < keys.length; ++i)
     {
         var key = keys[i];
-        if (objectA[key] && objectB[key])
+        if (objectA[key] !== undefined && objectB[key] !== undefined)
             result[key] = this._extend(objectA[key], objectB[key]);
-        else if (objectA[key])
+        else if (objectA[key] !== undefined)
             result[key] = objectA[key];
-        else if (objectB[key])
+        else if (objectB[key] !== undefined)
             result[key] = objectB[key];
     }
     return result;
@@ -699,6 +701,7 @@ module.exports = N3Parser;
 // :a :b :c.a:a :b :c.
 // :a :b :5.E3:a :b :c.
 //var parser = new N3Parser();
+//var jsonld = parser.parse('@prefix : <http://f4w.restdesc.org/demo#>. @prefix tmpl: <http://purl.org/restdesc/http-template#> . @prefix http: <http://www.w3.org/2011/http#> ._:sk15_1 http:methodName "POST". _:sk15_1 tmpl:requestURI ("http://defects.tho.f4w.l0g.in/api/reports"). _:sk15_1 http:body {_:sk16_1 :event_id 174 .   _:sk16_1 :operator_id 3 .   _:sk16_1 :solution_id 3 .   _:sk16_1 :success false.   _:sk16_1 :comment "solved!"}. :firstTry :triedAndReported _:sk17_1. :firstTry :tryNewSolution true.');
 //var jsonld = parser.parse('5 a :id.');
 //var jsonld = parser.parse(':a :tolerances ( {[ :min :min1; :max :max1 ]} {[ :min :min2; :max :max2 ]} ).');
 //var jsonld = parser.parse('{ :a }.');
