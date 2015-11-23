@@ -55,8 +55,6 @@ N3Parser.prototype.parse = function (n3String)
     n3String = this._replaceMatches(n3String, N3Parser._numericalRegex, replacementMap, literalMap, function (match) { match.jsonld = parseFloat(match[0]); return match; });
     n3String = this._replaceMatches(n3String, N3Parser._booleanRegex, replacementMap, literalMap, function (match) { match.jsonld = match[0] === 'true'; return match; });
 
-    valueMap = _.extend(valueMap, literalMap);
-
     var literalKeys = Object.keys(literalMap);
 
     // assume all remaining #'s belong to comments
@@ -68,6 +66,7 @@ N3Parser.prototype.parse = function (n3String)
 
     jsonld = this._simplification(jsonld, literalKeys);
     jsonld = this._revertMatches(jsonld, valueMap);
+    jsonld = this._revertMatches(jsonld, literalMap, true);
     this._unFlatten(jsonld); // edits in place
 
     // default graph is not necessary if there is only 1 root node
@@ -193,25 +192,25 @@ N3Parser.prototype._numericEscape = function (str)
 
 // TODO: reserved escape
 
-N3Parser.prototype._revertMatches = function (jsonld, invertedMap, baseURI)
+N3Parser.prototype._revertMatches = function (jsonld, invertedMap, literals, baseURI)
 {
     baseURI = baseURI || 'http://www.example.org/';
     if (_.isString(jsonld))
     {
         // jsonld doesn't put colons in front of uri's that have the base prefix
-        if (jsonld[0] === '%')
+        if (jsonld[0] === '%' && invertedMap[jsonld] !== undefined)
         {
-            var str = invertedMap[jsonld];
+            var v = invertedMap[jsonld];
             // current solution to not confuse JSONLDParser ( the URI #lemma1 gets encoded as { '@id': '#lemma1' }, at that point there is no way to know if we need to add the base prefix or not )
-            if (str[0] === ':')
-                str = baseURI + str.substring(1);
-            return str;
+            if (_.isString(v) && v[0] === ':')
+                v = baseURI + v.substring(1);
+            return v;
         }
         return jsonld;
     }
 
     if (_.isArray(jsonld))
-        return jsonld.map(function (thingy) { return this._revertMatches(thingy, invertedMap, baseURI); }, this);
+        return jsonld.map(function (thingy) { return this._revertMatches(thingy, invertedMap, literals, baseURI); }, this);
 
     if (jsonld['@context'] && jsonld['@context']['@vocab'])
     {
@@ -222,8 +221,11 @@ N3Parser.prototype._revertMatches = function (jsonld, invertedMap, baseURI)
     var result = {};
     for (var key in jsonld)
     {
-        var val = this._revertMatches(jsonld[key], invertedMap, baseURI);
-        key = this._revertMatches(key, invertedMap, baseURI);
+        var val = this._revertMatches(jsonld[key], invertedMap, literals, baseURI);
+        key = this._revertMatches(key, invertedMap, literals, baseURI);
+        // TODO: really really ugly hack for now
+        if (literals && key === '@id' && val !== jsonld[key])
+            val = '@@' + val;
         result[key] = val;
     }
     return result;
@@ -702,7 +704,7 @@ module.exports = N3Parser;
 // :a :b :5.E3:a :b :c.
 //var parser = new N3Parser();
 //var jsonld = parser.parse('@prefix : <http://f4w.restdesc.org/demo#>. @prefix tmpl: <http://purl.org/restdesc/http-template#> . @prefix http: <http://www.w3.org/2011/http#> ._:sk15_1 http:methodName "POST". _:sk15_1 tmpl:requestURI ("http://defects.tho.f4w.l0g.in/api/reports"). _:sk15_1 http:body {_:sk16_1 :event_id 174 .   _:sk16_1 :operator_id 3 .   _:sk16_1 :solution_id 3 .   _:sk16_1 :success false.   _:sk16_1 :comment "solved!"}. :firstTry :triedAndReported _:sk17_1. :firstTry :tryNewSolution true.');
-//var jsonld = parser.parse('5 a :id.');
+//var jsonld = parser.parse('_:a a :b.');
 //var jsonld = parser.parse(':a :tolerances ( {[ :min :min1; :max :max1 ]} {[ :min :min2; :max :max2 ]} ).');
 //var jsonld = parser.parse('{ :a }.');
 //var jsonld = parser.parse(':a :b 0, 1.');

@@ -156,6 +156,9 @@ JSONLDParser.prototype._URIfix = function (id, context)
     // TODO: how to handle literal subjects?
     if (id[0] === '?' || _.isNumber(id))
         return id + '';
+    // TODO: really really ugly fix again
+    if (id[0] === '@' && id[1] === '@')
+        return '"' + id.substring(2) + '"';
     var colonIdx = id.indexOf(':');
     if (colonIdx >= 0)
     {
