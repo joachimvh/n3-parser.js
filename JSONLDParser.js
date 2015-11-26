@@ -35,15 +35,7 @@ JSONLDParser.prototype._parse = function (jsonld, baseURI, context, graphList, r
     if (_.isString(jsonld))
         jsonld = {'@value': jsonld};
     if (jsonld['@value'])
-    {
-        var result = JSON.stringify(jsonld['@value']); // format('"%s"', jsonld['@value']);
-        // won't have triple quote strings since JSON converts newlines to \n
-        if (jsonld['@language'])
-            result = format('%s@%s', result, jsonld['@language']);
-        if (jsonld['@type'])
-            result = format('%s^^%s', result, this._URIfix(jsonld['@type'], context));
-        return result;
-    }
+        return this._valueFix(jsonld, context);
 
     if (Object.keys(jsonld).length === 0)
         return '[]';
@@ -65,7 +57,7 @@ JSONLDParser.prototype._parse = function (jsonld, baseURI, context, graphList, r
             context[''] = baseURI;
         }
     }
-    // TODO: shouldn't overwrite id if it already has a value
+    // TODO: if id is already filled in this is probably an error if there is a new value
     var id = jsonld['@id'] && this._URIfix(jsonld['@id'], context);
     if (jsonld['@graph'])
     {
@@ -151,9 +143,26 @@ JSONLDParser.prototype._parse = function (jsonld, baseURI, context, graphList, r
     return id;
 };
 
+JSONLDParser.prototype._valueFix = function (jsonld, context)
+{
+    if (!jsonld['@value'])
+        throw "Expected an object with a '@value' key.";
+
+    var result = JSON.stringify(jsonld['@value']); // format('"%s"', jsonld['@value']);
+    // won't have triple quote strings since JSON converts newlines to \n
+    if (jsonld['@language'])
+        result = format('%s@%s', result, jsonld['@language']);
+    if (jsonld['@type'])
+        result = format('%s^^%s', result, this._URIfix(jsonld['@type'], context));
+    return result;
+};
+
 JSONLDParser.prototype._URIfix = function (id, context)
 {
-    // TODO: how to handle literal subjects?
+    // literal as subject...
+    if (_.isObject(id) && id['@value'])
+        return this._valueFix(id, context);
+
     if (id[0] === '?' || _.isNumber(id))
         return id + '';
     // TODO: really really ugly fix again

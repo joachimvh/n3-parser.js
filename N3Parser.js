@@ -223,9 +223,9 @@ N3Parser.prototype._revertMatches = function (jsonld, invertedMap, literals, bas
     {
         var val = this._revertMatches(jsonld[key], invertedMap, literals, baseURI);
         key = this._revertMatches(key, invertedMap, literals, baseURI);
-        // TODO: really really ugly hack for now
-        if (literals && key === '@id' && val !== jsonld[key])
-            val = '@@' + val;
+        // convert subject literals (last check to not convert blank nodes)
+        if (key === '@id' && literals && _.isString(val) && val !== jsonld[key])
+            val = { '@value': val };
         result[key] = val;
     }
     return result;
@@ -704,7 +704,7 @@ module.exports = N3Parser;
 // :a :b :5.E3:a :b :c.
 //var parser = new N3Parser();
 //var jsonld = parser.parse('@prefix : <http://f4w.restdesc.org/demo#>. @prefix tmpl: <http://purl.org/restdesc/http-template#> . @prefix http: <http://www.w3.org/2011/http#> ._:sk15_1 http:methodName "POST". _:sk15_1 tmpl:requestURI ("http://defects.tho.f4w.l0g.in/api/reports"). _:sk15_1 http:body {_:sk16_1 :event_id 174 .   _:sk16_1 :operator_id 3 .   _:sk16_1 :solution_id 3 .   _:sk16_1 :success false.   _:sk16_1 :comment "solved!"}. :firstTry :triedAndReported _:sk17_1. :firstTry :tryNewSolution true.');
-//var jsonld = parser.parse('_:a a :b.');
+//var jsonld = parser.parse('"a"^^<xsd:int> :a _:a.');
 //var jsonld = parser.parse(':a :tolerances ( {[ :min :min1; :max :max1 ]} {[ :min :min2; :max :max2 ]} ).');
 //var jsonld = parser.parse('{ :a }.');
 //var jsonld = parser.parse(':a :b 0, 1.');
