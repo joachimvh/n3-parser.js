@@ -64,6 +64,9 @@ N3Parser.prototype.parse = function (n3String)
     var jsonld = this._statementsOptional(tokens);
     this._updatePathNodes(jsonld); // changes in place
 
+    var unsafePrefixes = this._collectUnsafePrefixes(jsonld, valueMap);
+    this._safeExpand(jsonld, valueMap, unsafePrefixes); // TODO: remove the offending prefix from context
+
     jsonld = this._simplification(jsonld, literalKeys);
     jsonld = this._revertMatches(jsonld, valueMap);
     jsonld = this._revertMatches(jsonld, literalMap, true);
@@ -152,7 +155,9 @@ N3Parser.prototype._replaceIRI = function (match)
 {
     var iri = match[0];
     if (iri[0] === '<')
-        iri = this._numericEscape(iri.substring(1, iri.length-1));
+        iri = { iri: this._numericEscape(iri.substring(1, iri.length-1)), prefixed: false };
+    else
+        iri = { iri: iri, prefixed: true };
     match.jsonld = iri;
     return match;
 };
@@ -192,6 +197,93 @@ N3Parser.prototype._numericEscape = function (str)
 
 // TODO: reserved escape
 
+N3Parser.prototype._safeExpand = function (jsonld, invertedIRIMap, unsafePrefixes, context)
+{
+    context = context || {};
+    if (_.isString(jsonld))
+    {
+        if ((jsonld in invertedIRIMap) && invertedIRIMap[jsonld].prefixed)
+        {
+            var iri = invertedIRIMap[jsonld].iri;
+            var colonIdx = iri.indexOf(':');
+            if (colonIdx >= 0)
+            {
+                var prefix = iri.substring(0, colonIdx);
+                var suffix = iri.substring(colonIdx+1);
+                if (unsafePrefixes[prefix] && context[prefix])
+                {
+                    invertedIRIMap[jsonld].prefixed = false;
+                    invertedIRIMap[jsonld].iri = invertedIRIMap[context[prefix]].iri + suffix;
+                }
+            }
+        }
+        return;
+    }
+
+    if (_.isArray(jsonld))
+        return jsonld.map(function (thingy) { return this._safeExpand(thingy, invertedIRIMap, unsafePrefixes, context); }, this);
+
+    if (_.isObject(jsonld))
+    {
+        // TODO: actually need to merge with nested context here, but we never generate that anyway...
+        if (jsonld['@context'])
+            context = jsonld['@context'];
+        for (var key in jsonld)
+        {
+            if (key === '@context')
+                continue;
+            this._safeExpand(key, invertedIRIMap, unsafePrefixes, context);
+            this._safeExpand(jsonld[key], invertedIRIMap, unsafePrefixes, context);
+        }
+        if (jsonld['@context'])
+        {
+            for (var prefix in unsafePrefixes)
+                delete jsonld['@context'][prefix];
+            if (Object.keys(jsonld['@context']).length === 0)
+                delete jsonld['@context'];
+        }
+    }
+};
+
+N3Parser.prototype._collectUnsafePrefixes = function (jsonld, invertedIRIMap, context)
+{
+    context = context || {};
+    if (_.isString(jsonld))
+    {
+        if ((jsonld in invertedIRIMap) && !invertedIRIMap[jsonld].prefixed)
+        {
+            var iri = invertedIRIMap[jsonld].iri;
+            for (var prefix in context)
+            {
+                if (iri.substring(0, prefix.length+1) === prefix + ':' && iri.substring(0, prefix.length+3) !== prefix + '://')
+                    return _.object([prefix],[true]);
+            }
+        }
+        return {};
+    }
+
+    if (_.isArray(jsonld))
+        return _.extend.apply(_, jsonld.map(function (thingy) { return this._collectUnsafePrefixes(thingy, invertedIRIMap, context); }, this));
+
+    if (_.isObject(jsonld))
+    {
+        // TODO: actually need to merge with nested context here, but we never generate that anyway...
+        if (jsonld['@context'])
+            context = jsonld['@context'];
+        var unsafe = [{}];
+        for (var key in jsonld)
+        {
+            if (key === '@context')
+                continue;
+            unsafe.push(this._collectUnsafePrefixes(key, invertedIRIMap, context));
+            unsafe.push(this._collectUnsafePrefixes(jsonld[key], invertedIRIMap, context));
+        }
+        return _.extend.apply(_, unsafe);
+    }
+
+    return {};
+};
+
 N3Parser.prototype._revertMatches = function (jsonld, invertedMap, literals, baseURI)
 {
     baseURI = baseURI || 'http://www.example.org/';
@@ -202,8 +294,10 @@ N3Parser.prototype._revertMatches = function (jsonld, invertedMap, literals, bas
         {
             var v = invertedMap[jsonld];
             // current solution to not confuse JSONLDParser ( the URI #lemma1 gets encoded as { '@id': '#lemma1' }, at that point there is no way to know if we need to add the base prefix or not )
-            if (_.isString(v) && v[0] === ':')
-                v = baseURI + v.substring(1);
+            if (v.prefixed && v.iri[0] === ':')
+                v.iri = baseURI + v.iri.substring(1);
+            if (v.iri)
+                v = v.iri;
             return v;
         }
         return jsonld;
@@ -214,7 +308,7 @@ N3Parser.prototype._revertMatches = function (jsonld, invertedMap, literals, bas
 
     if (jsonld['@context'] && jsonld['@context']['@vocab'])
     {
-        baseURI = invertedMap[jsonld['@context']['@vocab']];
+        baseURI = invertedMap[jsonld['@context']['@vocab']].iri;
         delete jsonld['@context']['@vocab']; // we need to delete @vocab since it is incorrect to take it into account, just used it to temporarily store the base uri
         if (Object.keys(jsonld['@context']).length === 0)
             delete jsonld['@context']
@@ -719,7 +813,7 @@ module.exports = N3Parser;
 //var jsonld = parser.parse('[:a :b] :c [:e :f].');
 //var jsonld = parser.parse(':a :b 5.E3.a:a :b :c.');
 //var jsonld = parser.parse('@prefix gr: <http://purl.org/goodrelations/v1#> . <http://www.acme.com/#store> a gr:Location; gr:hasOpeningHoursSpecification [ a gr:OpeningHoursSpecification; gr:opens "08:00:00"; gr:closes "20:00:00"; gr:hasOpeningHoursDayOfWeek gr:Friday, gr:Monday, gr:Thursday, gr:Tuesday, gr:Wednesday ]; gr:name "Hepp\'s Happy Burger Restaurant" .');
-//parser.parse(':a :b :c. :c :d :e.');
+//var jsonld = parser.parse('@prefix ex:<http://ex.org/>. <:a> <ex:b> ex:c.');
 //console.log(JSON.stringify(jsonld, null, 4));
 
 //var fs = require('fs');
