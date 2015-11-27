@@ -743,9 +743,12 @@ N3Parser.prototype._combinePredicateObjects = function (predicate, objects, nest
     {
         var blank = '_:b_' + uuid.v4();
         // this tells the final parser to move this part up a level
-        jsonld['..'] = [this._extend({'@id': blank}, predicate)];
-        for (var i = 0; i < nestLevel; ++i)
-            jsonld['..'] = {'..': jsonld['..']};
+        if (Object.keys(predicate).length > 0)
+        {
+            jsonld['..'] = [this._extend({'@id':blank}, predicate)];
+            for (var i = 0; i < nestLevel; ++i)
+                jsonld['..'] = {'..':jsonld['..']};
+        }
         jsonld[blank] = objects;
     }
     else
