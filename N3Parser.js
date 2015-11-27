@@ -216,6 +216,8 @@ N3Parser.prototype._revertMatches = function (jsonld, invertedMap, literals, bas
     {
         baseURI = invertedMap[jsonld['@context']['@vocab']];
         delete jsonld['@context']['@vocab']; // we need to delete @vocab since it is incorrect to take it into account, just used it to temporarily store the base uri
+        if (Object.keys(jsonld['@context']).length === 0)
+            delete jsonld['@context']
     }
 
     var result = {};
