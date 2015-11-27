@@ -690,6 +690,9 @@ N3Parser.prototype._pathlist = function (tokens)
 N3Parser.prototype._formulacontent = function (tokens)
 {
     var content = {};
+    // handle empty formulas
+    if (tokens[0] === '}')
+        return { '@graph': []};
     while (tokens[0] !== '}')
     {
         // difference with statements_optional: this one doesn't necessarily end with a dot
