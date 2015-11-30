@@ -51,11 +51,12 @@ JSONLDParser.prototype._parse = function (jsonld, baseURI, context, graphList, r
             graphList.push(format('PREFIX %s: <%s>\n', key, val));
             context[key] = val;
         }
-        if (!context[''] && baseURI)
-        {
-            graphList.push(format('PREFIX : <%s>\n', baseURI));
-            context[''] = baseURI;
-        }
+    }
+    if (root && !context[''] && baseURI)
+    {
+        graphList.push(format('PREFIX : <%s>\n', baseURI));
+        context[''] = baseURI;
+        baseURI = undefined; // we only need to set it once
     }
     // TODO: if id is already filled in this is probably an error if there is a new value
     var id = jsonld['@id'] && this._URIfix(jsonld['@id'], context);
