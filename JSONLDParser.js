@@ -59,7 +59,9 @@ JSONLDParser.prototype._parse = function (jsonld, baseURI, context, graphList, r
         baseURI = undefined; // we only need to set it once
     }
     // TODO: if id is already filled in this is probably an error if there is a new value
-    var id = jsonld['@id'] && this._URIfix(jsonld['@id'], context);
+    var id = jsonld['@id'];
+    if (id !== undefined)
+        id = this._URIfix(jsonld['@id'], context);
     if (jsonld['@graph'])
     {
         var localList = [];
@@ -164,7 +166,7 @@ JSONLDParser.prototype._URIfix = function (id, context)
     if (_.isObject(id) && id['@value'])
         return this._valueFix(id, context);
 
-    if (id[0] === '?' || _.isNumber(id))
+    if (id[0] === '?' || _.isNumber(id) || _.isBoolean(id))
         return id + '';
     // TODO: really really ugly fix again
     if (id[0] === '@' && id[1] === '@')
