@@ -22,7 +22,7 @@ JSONLDParser.prototype.toN3 = function (jsonld, baseURI)
     var n3 = this._toN3(jsonld, context, idMap);
 
     // remove root graph
-    if (('@graph' in jsonld) && !_.startsWith(n3.statement, '{} .') && jsonld['@graph'].length > 1)
+    if (('@graph' in jsonld) && !_.startsWith(n3.statement, '{} .'))
         n3.statement = n3.statement.substring(2, n3.statement.length-2);
 
     var result;
