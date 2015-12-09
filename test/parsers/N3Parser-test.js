@@ -1,6 +1,6 @@
 
 var assert = require('assert');
-var N3Parser = require('../../N3Parser2');
+var N3Parser = require('../../N3Parser');
 var _ = require('lodash');
 
 // note that some of these tests are too strict (since there are always multiple ways to describe content)
