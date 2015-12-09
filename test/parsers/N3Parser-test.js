@@ -1,6 +1,6 @@
 
 var assert = require('assert');
-var N3Parser = require('../../N3Parser');
+var N3Parser = require('../../N3Parser2');
 var _ = require('lodash');
 
 // note that some of these tests are too strict (since there are always multiple ways to describe content)
@@ -76,18 +76,21 @@ describe('N3Parser', function ()
         it('should be supported in all positions', function ()
         {
             var jsonld = parser.toJSONLD('true false true.');
-            // TODO: or should it be { '@value': true } for the subject?
-            var expected = { '@id': true, false: true };
+            var blank = jsonld['@graph'][0]['@id'];
+            var expected = { '@graph': [{ '@id': blank, '@value': false}, { '@value': true }] };
+            expected['@graph'][1][blank] = true;
             assert.deepEqual(jsonld, expected);
 
             jsonld = parser.toJSONLD('1 0 1.');
-            // TODO: can't have numbers as predicates..., also, same question as above
-            expected = { '0': 1, '@id': 1 };
+            blank = jsonld['@graph'][0]['@id'];
+            expected = { '@graph': [{ '@id': blank, '@value': 0}, { '@value': 1 }] };
+            expected['@graph'][1][blank] = 1;
             assert.deepEqual(jsonld, expected);
 
             jsonld = parser.toJSONLD('"true" "false" "true".');
-            // TODO: this predicate obviously can't be correct if the previous ones are correct
-            expected = { '@value': 'true', false: 'true' };
+            blank = jsonld['@graph'][0]['@id'];
+            expected = { '@graph': [{ '@id': blank, '@value': 'false'}, { '@value': 'true' }] };
+            expected['@graph'][1][blank] = 'true';
             assert.deepEqual(jsonld, expected);
         });
 
@@ -117,8 +120,8 @@ describe('N3Parser', function ()
             assert.deepEqual(jsonld, expected);
 
             jsonld = parser.toJSONLD('x:a x:b 5.E3.a:a x:b x:c.');
-            expected = { "@graph": [ { "@id": "x:a", "x:b": 5 },
-                                     {  "@id": "E3.a:a", "x:b": { "@id": "x:c" } }]} ;
+            expected = { "@graph": [ { "@id": "x:a", "x:b": 5000 },
+                                     {  "@id": "a:a", "x:b": { "@id": "x:c" } }]} ;
             assert.deepEqual(jsonld, expected);
         });
     });

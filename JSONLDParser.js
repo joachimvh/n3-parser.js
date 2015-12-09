@@ -5,12 +5,12 @@
 var _ = require('lodash');
 var Util = require('./Util');
 var format = require('util').format;
-var N3Parser = require('./N3Parser');
+var N3Lexer = require('./N3Lexer');
 
 function JSONLDParser () {}
 
 // used to make sure URIs are still valid after simplification
-JSONLDParser.suffixTest = new RegExp('^' + N3Parser._suffix.source + '$');
+JSONLDParser.suffixTest = new RegExp('^' + N3Lexer._suffix.source + '$');
 
 JSONLDParser.prototype.toN3 = function (jsonld, baseURI)
 {
