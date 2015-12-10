@@ -37,29 +37,33 @@ describe('JSONLDParser', function ()
         {
             // TODO: this would be a lot easier if I had a set way to actually use subject/predicate literals, so just testing some subcases for now
             // TODO: no way to differentiate predicates for now
-            var jsonld = { true: true, '@id': true };
+            var jsonld = { '@graph': [{ '@id': '_:b1', '@value': false}, { '_:b1': true, '@value': true }] };
             var n3 = parser.toN3(jsonld);
-            assert.deepEqual(n3, 'true <true> true .');
+            assert.deepEqual(n3, 'true false true .');
 
-            jsonld = { '5': 6, '@id': 7};
+            jsonld = { '@graph': [{ '@id': '_:b1', '@value': 6}, { '_:b1': 7, '@value': 5 }] };
             n3 = parser.toN3(jsonld);
-            assert.deepEqual(n3, '7 <5> 6 .');
+            assert.deepEqual(n3, '5 6 7 .');
 
-            jsonld = { 'a': 'b', '@value': 'c' };
+            jsonld = { '@graph': [{ '@id': '_:b1', '@value': 'b'}, { '_:b1': 'c', '@value': 'a' }] };
             n3 = parser.toN3(jsonld);
-            assert.deepEqual(n3, '"c" <a> "b" .');
+            assert.deepEqual(n3, '"a" "b" "c" .');
 
-            jsonld = { 'a': { '@value' : 'b', '@language': 'en-gb' }, '@value': 'c', '@language': 'en-gb'};
+            jsonld = { '@graph': [{ '@id': '_:b1', '@value': 'b', '@language': 'en-gb'}, { '_:b1': { '@value' : 'c', '@language': 'en-gc' }, '@value': 'a', '@language': 'en-ga'}]};
             n3 = parser.toN3(jsonld);
-            assert.deepEqual(n3, '"c"@en-gb <a> "b"@en-gb .');
+            assert.deepEqual(n3, '"a"@en-ga "b"@en-gb "c"@en-gc .');
 
-            jsonld = { '@context': { 'xsd': 'http://www.w3.org/2001/XMLSchema#' }, 'a': { '@value' : 'b', '@type': 'xsd:string' }, '@value': 'c', '@type': 'xsd:string'};
+            jsonld = { '@context': { 'xsd': 'http://www.w3.org/2001/XMLSchema#' },
+                       '@graph': [{ '@id': '_:b1', '@value': 'b', '@type': 'xsd:string'}, { '_:b1': { '@value' : 'c', '@type': 'xsd:string' }, '@value': 'a', '@type': 'xsd:string'}]};
             n3 = parser.toN3(jsonld);
-            assert.deepEqual(n3, 'PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>\n"c"^^xsd:string <a> "b"^^xsd:string .');
+            assert.deepEqual(n3, 'PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>\n"a"^^xsd:string "b"^^xsd:string "c"^^xsd:string .');
 
-            jsonld = { 'a': { '@value' : 'b', '@type': 'http://www.w3.org/2001/XMLSchema#string' }, '@value': 'c', '@type': 'http://www.w3.org/2001/XMLSchema#string'};
+            jsonld = { '@graph': [{ '@id': '_:b1', '@value': 'b', '@type': 'http://www.w3.org/2001/XMLSchema#string'},
+                                  { '_:b1': { '@value' : 'c', '@type': 'http://www.w3.org/2001/XMLSchema#string' },
+                                    '@value': 'a',
+                                    '@type': 'http://www.w3.org/2001/XMLSchema#string'}]};
             n3 = parser.toN3(jsonld);
-            assert.deepEqual(n3, '"c"^^<http://www.w3.org/2001/XMLSchema#string> <a> "b"^^<http://www.w3.org/2001/XMLSchema#string> .');
+            assert.deepEqual(n3, '"a"^^<http://www.w3.org/2001/XMLSchema#string> "b"^^<http://www.w3.org/2001/XMLSchema#string> "c"^^<http://www.w3.org/2001/XMLSchema#string> .');
         });
     });
 
@@ -69,8 +73,17 @@ describe('JSONLDParser', function ()
         {
             var jsonld = { '@graph': [ { '@list': [], '_:b': { '@list': [] }}, { '@id': '_:b', '@list': [] } ]};
             var n3 = parser.toN3(jsonld);
-            // TODO: this isn't parsed correctly yet, might be hard to do
-            //assert.deepEqual(n3, '() () () .');
+            assert.deepEqual(n3, '() () () .');
+        });
+    });
+
+    describe('formulas', function ()
+    {
+        it('should be supported in all positions', function ()
+        {
+            var jsonld = { '@graph': [ { '@graph': [], '_:b': { '@graph': [] }}, { '@id': '_:b', '@graph': [] } ]};
+            var n3 = parser.toN3(jsonld);
+            assert.deepEqual(n3, '{} {} {} .');
         });
     });
 });

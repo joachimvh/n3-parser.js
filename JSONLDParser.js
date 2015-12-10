@@ -67,7 +67,16 @@ JSONLDParser.prototype._toN3 = function (jsonld, context, idMap)
         _.assign(newIDMap, idMap);
         n3s = _.map(jsonld['@graph'], function (thingy) { return this._toN3(thingy, context, newIDMap); }.bind(this));
         // results with no triples are subject triples
-        subject = format('{ %s }', this.tripleListToN3(_.flatten(_.map(n3s, function (n3) { return n3.triples.length > 0 ? n3.triples : { subject: n3.statement }; })), newIDMap));
+        subject = format('{ %s }', this.tripleListToN3(_.flatten(_.map(n3s,
+            function (n3)
+            {
+                if (n3.triples.length > 0)
+                    return n3.triples;
+                if (n3.statement in newIDMap)
+                    return [];
+                return  { subject: n3.statement };
+            })),
+            newIDMap));
         if (subject === '{  }')
             subject = '{}';
     }

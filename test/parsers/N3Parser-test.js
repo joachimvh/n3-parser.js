@@ -79,6 +79,7 @@ describe('N3Parser', function ()
             var blank = jsonld['@graph'][0]['@id'];
             var expected = { '@graph': [{ '@id': blank, '@value': false}, { '@value': true }] };
             expected['@graph'][1][blank] = true;
+            console.log(jsonld);
             assert.deepEqual(jsonld, expected);
 
             jsonld = parser.toJSONLD('1 0 1.');
@@ -162,6 +163,23 @@ describe('N3Parser', function ()
         {
             var jsonld = parser.toJSONLD('<a> <b> { <c> <d> { <e> <f> "g" }}.');
             var expected = {"@id":"a","b":{"@graph":[{"@id":"c","d":{"@graph":[{"@id":"e","f":"g"}]}}]}};
+            assert.deepEqual(jsonld, expected);
+        });
+    });
+
+    describe('comments', function ()
+    {
+        it('should be ignored', function ()
+        {
+            var base = parser.toJSONLD('PREFIX : <http://example.org/>\n :a :b :c.');
+            var jsonld = parser.toJSONLD(' # comment1 <\n PREFIX : <http://example.org/>\n :a :b #comment 2 "{[(\n:c.');
+            assert.deepEqual(jsonld, base);
+        });
+
+        it('should be detected correctly', function ()
+        {
+            var jsonld = parser.toJSONLD(' # comment1 <\n PREFIX : <http://example.org#>\n :a :b #comment 2 "{[(\n """multistring\n# not a comment!""".');
+            var expected = { '@id': 'http://example.org#a', 'http://example.org#b': 'multistring\n# not a comment!' };
             assert.deepEqual(jsonld, expected);
         });
     });
