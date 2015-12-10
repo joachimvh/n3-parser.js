@@ -107,7 +107,9 @@ N3Parser.prototype._parse = function (lex, root, expand)
         result = { '@value': lex.val == 'true' || lex.val === '@true' };
     else if (lex.type === 'NumericLiteral')
         result = { '@value': parseFloat(lex.val) };
-    else if (lex.type === 'ExplicitIRI') // TODO: detect unsafe prefixes
+    else if (lex.type === 'Variable')
+        result = { '@id' : lex.val };
+    else if (lex.type === 'ExplicitIRI')
         result = { '@id': this._numericEscape(lex.val.substring(1, lex.val.length-1)) }; // remove < >
     else if (lex.type === 'PrefixedIRI')
     {
@@ -377,6 +379,7 @@ module.exports = N3Parser;
 // :a :b :c.a:a :b :c.
 // :a :b :5.E3:a :b :c.
 //var parser = new N3Parser();
+//var jsonld = parser.toJSONLD('_:request http:methodName "GET"; tmpl:requestURI ("http://skillp.tho.f4w.l0g.in/api/operator_skills/" ?id); http:resp [ http:body _:body ]. _:body :contains {[ :name _:name; :desc _:desc; :role _:role; :skills {[ :machine _:m; :tool _:t; :computer _:c]} ]}. ?operator :machineSkills _:m; :toolSkills _:t; :computerSkills _:c. ?operator :name _:name; :desc _:desc; :role _:role.');
 //var jsonld = parser.toJSONLD('() {() () ()} ().');
 //var jsonld = parser.toJSONLD('@prefix : <http://f4w.restdesc.org/demo#>. @prefix tmpl: <http://purl.org/restdesc/http-template#> . @prefix http: <http://www.w3.org/2011/http#> ._:sk15_1 http:methodName "POST". _:sk15_1 tmpl:requestURI ("http://defects.tho.f4w.l0g.in/api/reports"). _:sk15_1 http:body {_:sk16_1 :event_id 174 .   _:sk16_1 :operator_id 3 .   _:sk16_1 :solution_id 3 .   _:sk16_1 :success false.   _:sk16_1 :comment "solved!"}. :firstTry :triedAndReported _:sk17_1. :firstTry :tryNewSolution true.');
 //var jsonld = parser.toJSONLD('"a"^^<xsd:int> :a _:a.');
