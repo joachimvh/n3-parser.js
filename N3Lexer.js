@@ -24,6 +24,9 @@ N3Lexer._suffix = new RegExp(
 N3Lexer._prefixIRI = new RegExp(
     '(?:' + N3Lexer._prefix.source + ')?:' + N3Lexer._suffix.source
 );
+N3Lexer._variableRegex = new RegExp(
+    '\\?' + N3Lexer._prefix.source
+);
 N3Lexer._iriRegex = /<[^>]*>/;
 N3Lexer._stringRegex = /("|')(\1\1)?(?:[^]*?[^\\])??(?:\\\\)*\2\1/;
 N3Lexer._datatypeRegex = new RegExp(
@@ -88,6 +91,10 @@ N3Lexer.prototype._subject = function (state)
 
 N3Lexer.prototype._propertylist = function (state)
 {
+    // propertylist can be empty!
+    var c = state.firstChar();
+    if (/[.\]})]/.exec(c))
+        return [];
     var propertyLists = [{ type: 'PredicateObject', val: [ this._predicate(state), this._objects(state) ] }];
     while (state.firstChar() === ';')
     {
@@ -177,7 +184,11 @@ N3Lexer.prototype._expression = function (state)
         state.move(')');
         result = { type: 'List', val: expressions };
     }
-    else if (c === '?') throw 'Not supported yet.'; // quickvariable
+    else if (c === '?')
+    {
+        match = state.extract(N3Lexer._variableRegex);
+        result = { type: 'Variable', val: match };
+    }
     else if (c === '"' || c === "'")
     {
         match = state.extract(N3Lexer._literalRegex);
