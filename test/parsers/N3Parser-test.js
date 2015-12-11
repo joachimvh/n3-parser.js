@@ -79,7 +79,6 @@ describe('N3Parser', function ()
             var blank = jsonld['@graph'][0]['@id'];
             var expected = { '@graph': [{ '@id': blank, '@value': false}, { '@value': true }] };
             expected['@graph'][1][blank] = true;
-            console.log(jsonld);
             assert.deepEqual(jsonld, expected);
 
             jsonld = parser.toJSONLD('1 0 1.');
