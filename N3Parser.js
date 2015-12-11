@@ -350,6 +350,11 @@ N3Parser.prototype._mergeNodes = function (objectA, objectB)
     if (_.isArray(objectA) && _.isArray(objectB))
         return objectA.concat(objectB);
 
+    var idA = objectA['@id'];
+    var idB = objectB['@id'];
+    if (idA !== idB || (idA === undefined && idB === undefined))
+        return [objectA, objectB];
+
     // 2 objects
     var result = {};
     var keys = _.union(Object.keys(objectA), Object.keys(objectB));

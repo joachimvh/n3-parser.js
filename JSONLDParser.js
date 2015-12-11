@@ -137,7 +137,7 @@ JSONLDParser.prototype._toN3 = function (jsonld, context, idMap)
 
     // blank nodes []
     if (subject === undefined)
-        return { statement: this.tripleListToN3(triples, idMap), triples: roots };
+        return { statement: triples.length === 0 ? '[]' : this.tripleListToN3(triples, idMap), triples: roots };
     else
         return { statement: subject, triples: triples.concat(roots) };
 };
