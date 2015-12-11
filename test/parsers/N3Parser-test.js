@@ -204,5 +204,18 @@ describe('N3Parser', function ()
         });
     });
 
-    // TODO: simplification/complex paths/etc.
+    describe('simplification', function()
+    {
+        it('merges triples with identical subjects and predicates', function ()
+        {
+            var jsonld = parser.toJSONLD('<a> <b> <c>. <a> <b> <d>. <c> <d> <e>. <c> <e> <d>. ');
+            assert.deepEqual(jsonld, {'@id':'a',b:[{'@id':'c',d:{'@id':'e'},e:{'@id':'d'}},{'@id':'d'}]});
+        });
+
+        it('can handle loops in the triple data', function ()
+        {
+            var jsonld = parser.toJSONLD('<a> <b> <c>. <c> <b> <d>. <d> <b> <a>.');
+            assert.deepEqual(jsonld, {'@id':'c',b:{'@id':'d',b:{'@id':'a',b:{'@id':'c'}}}}); // this is obviously highly dependent on the parser implementation
+        });
+    });
 });

@@ -269,7 +269,14 @@ N3Parser.prototype._compact = function (jsonld)
         var id = thingy['@id'];
         if (!id || nodes[id].references.length === 0)
             newGraph.push(thingy);
+        else
+        {
+            // delete reference for other nodes
+            for (var key in nodes)
+                nodes[key].references = _.without(nodes[key].references, id);
+        }
     }
+    newGraph = this._breakLoops(newGraph);
     jsonld['@graph'] = newGraph;
     this._compact(newGraph);
 };
@@ -298,6 +305,27 @@ N3Parser.prototype._findReferences = function (jsonld, nodes, parent)
     // adding the predicates would only be necessary if we delete the blank node @ids
     for (var key in jsonld)
         this._findReferences(jsonld[key], nodes, ('@id' in jsonld) ? jsonld['@id'] : jsonld);
+};
+
+N3Parser.prototype._breakLoops = function (jsonld, parents)
+{
+    if (Util.isLiteral(jsonld) || '@graph' in jsonld)
+        return jsonld;
+
+    if (_.isArray(jsonld))
+        return _.map(jsonld, function (thingy) { return this._breakLoops(thingy, parents); }.bind(this));
+
+    if ('@id' in jsonld)
+    {
+        if (_.contains(parents, jsonld['@id']))
+            return { '@id': jsonld['@id'] };
+        parents = parents || [];
+        parents = parents.concat([jsonld['@id']]);
+    }
+    var result = {};
+    for (var key in jsonld)
+        result[key] = this._breakLoops(jsonld[key], parents);
+    return result;
 };
 
 N3Parser.prototype._expand = function (jsonld, nodes)
