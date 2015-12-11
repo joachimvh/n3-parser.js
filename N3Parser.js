@@ -365,7 +365,7 @@ N3Parser.prototype._mergeNodes = function (objectA, objectB)
         }
 
         if (objectA[key] !== undefined && objectB[key] !== undefined)
-            result[key] = this._extend(objectA[key], objectB[key]);
+            result[key] = this._mergeNodes(objectA[key], objectB[key]);
         else if (objectA[key] !== undefined)
             result[key] = objectA[key];
         else if (objectB[key] !== undefined)
