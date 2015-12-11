@@ -242,6 +242,10 @@ N3Parser.prototype._simplify = function (jsonld)
             result[key] = objects;
         }
     }
+    // this is a special case where we have literals as triples without predicates in the graph root
+    if ('@graph' in result)
+        result['@graph'] = _.map(result['@graph'], function (thingy) { if (Util.isLiteral(thingy)) return { '@value': thingy}; return thingy; });
+
     return result;
 };
 

@@ -183,5 +183,26 @@ describe('N3Parser', function ()
         });
     });
 
+    describe('subjects', function ()
+    {
+        it("don't need no predicates", function ()
+        {
+            var jsonld = parser.toJSONLD('{}.');
+            assert.deepEqual(jsonld, { '@graph': [] });
+
+            jsonld = parser.toJSONLD('[].');
+            assert.deepEqual(jsonld, {});
+
+            jsonld = parser.toJSONLD('5.');
+            assert.deepEqual(jsonld, { '@value': 5 });
+
+            jsonld = parser.toJSONLD('"a".');
+            assert.deepEqual(jsonld, { '@value': 'a' });
+
+            jsonld = parser.toJSONLD('<a>.');
+            assert.deepEqual(jsonld, { '@id': 'a' });
+        });
+    });
+
     // TODO: simplification/complex paths/etc.
 });

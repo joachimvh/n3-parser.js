@@ -75,6 +75,13 @@ describe('JSONLDParser', function ()
             var n3 = parser.toN3(jsonld);
             assert.deepEqual(n3, '() () () .');
         });
+
+        it('should support all kinds of content', function ()
+        {
+            var jsonld = { '@id': 'a', b: { '@list': [ true, 1, 'c', { '@id': 'c' } ] }};
+            var n3 = parser.toN3(jsonld);
+            assert.deepEqual(n3, '<a> <b> ( true 1 "c" <c> ) .');
+        });
     });
 
     describe('formulas', function ()
@@ -86,4 +93,27 @@ describe('JSONLDParser', function ()
             assert.deepEqual(n3, '{} {} {} .');
         });
     });
+
+    describe('subjects', function ()
+    {
+        it("don't need no predicates", function ()
+        {
+            var jsonld = { '@graph': [] };
+            var n3 = parser.toN3(jsonld);
+            assert.deepEqual(n3, '{} .');
+
+            // TODO: what does '[] .' look like? and {[]}?
+            jsonld = {};
+            n3 = parser.toN3(jsonld);
+            assert.deepEqual(n3, '[] .');
+
+            jsonld = { '@value': 5 };
+            n3 = parser.toN3(jsonld);
+            assert.deepEqual(n3, '5 .');
+
+            jsonld = { '@id': 'a' };
+            n3 = parser.toN3(jsonld);
+            assert.deepEqual(n3, '<a> .');
+        })
+    })
 });
