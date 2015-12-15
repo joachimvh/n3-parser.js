@@ -267,16 +267,24 @@ N3Parser.prototype._compact = function (jsonld)
     {
         var thingy = jsonld['@graph'][i];
         var id = thingy['@id'];
-        if (!id || nodes[id].references.length === 0)
-            newGraph.push(thingy);
-        else
+        if (!id || (id in nodes && nodes[id].references.length === 0))
         {
-            // delete reference for other nodes
-            for (var key in nodes)
-                nodes[key].references = _.without(nodes[key].references, id);
+            newGraph.push(thingy);
+            if (id)
+                this._cleanReferences(nodes, id);
         }
     }
-    newGraph = this._breakLoops(newGraph);
+    // there are some nodes left, meaning there is a loop in there somewhere
+    if (Object.keys(nodes).length > 0)
+    {
+        while (Object.keys(nodes).length > 0)
+        {
+            var key = Object.keys(nodes)[0];
+            newGraph.push(nodes[key].node);
+            this._cleanReferences(nodes, key);
+        }
+        newGraph = this._breakLoops(newGraph);
+    }
     jsonld['@graph'] = newGraph;
     this._compact(newGraph);
 };
@@ -297,6 +305,7 @@ N3Parser.prototype._findReferences = function (jsonld, nodes, parent)
             nodes[id].node = this._mergeNodes(nodes[id].node, jsonld);
         if (parent && nodes[id].references.indexOf(parent) < 0)
             nodes[id].references.push(parent);
+        parent = id;
     }
 
     if ('@graph' in jsonld)
@@ -304,7 +313,15 @@ N3Parser.prototype._findReferences = function (jsonld, nodes, parent)
 
     // adding the predicates would only be necessary if we delete the blank node @ids
     for (var key in jsonld)
-        this._findReferences(jsonld[key], nodes, ('@id' in jsonld) ? jsonld['@id'] : jsonld);
+        this._findReferences(jsonld[key], nodes, parent);
+};
+
+N3Parser.prototype._cleanReferences = function (nodes, reference)
+{
+    delete nodes[reference];
+    for (var key in nodes)
+        if (_.contains(nodes[key].references, reference))
+            this._cleanReferences(nodes, key);
 };
 
 N3Parser.prototype._breakLoops = function (jsonld, parents)

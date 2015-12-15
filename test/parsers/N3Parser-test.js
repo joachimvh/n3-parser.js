@@ -215,7 +215,13 @@ describe('N3Parser', function ()
         it('can handle loops in the triple data', function ()
         {
             var jsonld = parser.toJSONLD('<a> <b> <c>. <c> <b> <d>. <d> <b> <a>.');
-            assert.deepEqual(jsonld, {'@id':'c',b:{'@id':'d',b:{'@id':'a',b:{'@id':'c'}}}}); // this is obviously highly dependent on the parser implementation
+            assert.deepEqual(jsonld, {'@id':'a',b:{'@id':'c',b:{'@id':'d',b:{'@id':'a'}}}}); // this is obviously highly dependent on the parser implementation
+        });
+
+        it('without screwing up non-looping data', function ()
+        {
+            var jsonld = parser.toJSONLD('<a> <b> <c>. <c> <b> <d>. <d> <b> <f>.');
+            assert.deepEqual(jsonld, {'@id':'a',b:{'@id':'c',b:{'@id':'d',b:{'@id':'f'}}}}); // this is obviously highly dependent on the parser implementation
         });
     });
 });
