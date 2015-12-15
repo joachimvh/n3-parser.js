@@ -280,7 +280,9 @@ N3Parser.prototype._compact = function (jsonld)
         while (Object.keys(nodes).length > 0)
         {
             var key = Object.keys(nodes)[0];
-            newGraph.push(nodes[key].node);
+            // if 'nothing' is referencing the node, but it wasn't added it means it was referenced by a blank node probably
+            if (nodes[key].references.length > 0)
+                newGraph.push(nodes[key].node);
             this._cleanReferences(nodes, key);
         }
         newGraph = this._breakLoops(newGraph);

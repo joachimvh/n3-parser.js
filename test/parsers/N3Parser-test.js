@@ -223,5 +223,11 @@ describe('N3Parser', function ()
             var jsonld = parser.toJSONLD('<a> <b> <c>. <c> <b> <d>. <d> <b> <f>.');
             assert.deepEqual(jsonld, {'@id':'a',b:{'@id':'c',b:{'@id':'d',b:{'@id':'f'}}}}); // this is obviously highly dependent on the parser implementation
         });
+
+        it('can handle blank nodes', function ()
+        {
+            var jsonld = parser.toJSONLD('[ <a> <b>; ].');
+            assert.deepEqual(jsonld, { a: { '@id': 'b' }});
+        })
     });
 });

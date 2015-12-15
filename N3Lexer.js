@@ -98,7 +98,12 @@ N3Lexer.prototype._propertylist = function (state)
     var propertyLists = [{ type: 'PredicateObject', val: [ this._predicate(state), this._objects(state) ] }];
     while (state.firstChar() === ';')
     {
-        state.move(';');
+        // you can have multiple semicolons...
+        while (state.firstChar() === ';')
+            state.move(';');
+        // propertylist can end on a semicolon...
+        if (/[.\]})]/.exec(state.firstChar()))
+            break;
         propertyLists.push({ type: 'PredicateObject', val: [ this._predicate(state), this._objects(state) ] });
     }
     return propertyLists;
