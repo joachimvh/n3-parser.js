@@ -228,6 +228,12 @@ describe('N3Parser', function ()
         {
             var jsonld = parser.toJSONLD('[ <a> <b>; ].');
             assert.deepEqual(jsonld, { a: { '@id': 'b' }});
+        });
+
+        it("can handle Ruben's funky triple", function ()
+        {
+            var jsonld = parser.toJSONLD('[ <> () ;;; ] <> ([ <> () ;;; <> () ]) ;;; <> [ <> () ;;; ].');
+            assert.deepEqual(jsonld, { "": [ { "@list": [] }, { "@list": [ { "": [ { "@list": [] }, { "@list": [] } ] } ] }, { "": { "@list": [] } } ] });
         })
     });
 });
