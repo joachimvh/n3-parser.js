@@ -15,7 +15,7 @@ JSONLDParser.suffixTest = new RegExp('^' + N3Lexer._suffix.source + '$');
 JSONLDParser.prototype.toN3 = function (jsonld, baseURI)
 {
     var idMap = {};
-    var context = jsonld['@context'] || {};
+    var context = _.cloneDeep(jsonld['@context']) || {};
     context['_'] = '_';
     if (baseURI)
         context[''] = baseURI;
