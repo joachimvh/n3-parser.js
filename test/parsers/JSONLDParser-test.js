@@ -1,6 +1,7 @@
 
 var assert = require('assert');
 var JSONLDParser = require('../../JSONLDParser');
+var N3Parser = require('../../N3Parser');
 var _ = require('lodash');
 
 // note that some of these tests are too strict (since there are always multiple ways to describe content)
@@ -25,8 +26,10 @@ describe('JSONLDParser', function ()
             n3 = parser.toN3(jsonld);
             assert.deepEqual(n3, '<http://example.com/c> <http://example.com/a> <http://example.com/b> .');
 
-            jsonld = { 'http://example.com/a': { '@id': 'http://example.com/b'}, '@id': 'http://example.com/c' };
-            n3 = parser.toN3(jsonld, 'http://example.com/');
+            jsonld = { '@context': {}, '@id': N3Parser.BASE + ':c' };
+            jsonld['@context'][N3Parser.BASE] = 'http://example.com/';
+            jsonld[N3Parser.BASE + ':a'] = { '@id': N3Parser.BASE + ':b'};
+            n3 = parser.toN3(jsonld);
             assert.deepEqual(n3, 'PREFIX : <http://example.com/>\n:c :a :b .');
         });
     });

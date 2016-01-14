@@ -9,6 +9,8 @@ var _ = require('lodash');
 
 function N3Parser () {}
 
+N3Parser.BASE = Util.BASE;
+
 N3Parser.prototype.toJSONLD = function (input)
 {
     var lexer = new N3Lexer();
@@ -41,7 +43,7 @@ N3Parser.prototype._parse = function (lex, root, expand)
 
         var unsafe = this._unsafePrefixes(lex, _.assign({}, expand || {}));
         if (expand && '' in expand)
-            unsafe[''] = expand['']; // always expand base prefix
+            unsafe[''] = expand['']; // delete empty prefix, BASE prefix will be added though
 
         for (i = 0; i < lex.val.length; ++i)
         {
@@ -51,6 +53,8 @@ N3Parser.prototype._parse = function (lex, root, expand)
             else
                 result['@graph'].push(this._parse(statement, result, unsafe));
         }
+        if (result['@context'][''])
+            result['@context'][N3Parser.BASE] = result['@context'][''];
         for (var key in unsafe)
             delete result['@context'][key]; // delete unsafe keys from context to prevent confusion
     }
@@ -115,7 +119,9 @@ N3Parser.prototype._parse = function (lex, root, expand)
     {
         var prefixIdx = lex.val.indexOf(':');
         var prefix = lex.val.substring(0, prefixIdx);
-        if (prefix in expand)
+        if (prefix === '')
+            result = { '@id': N3Parser.BASE + lex.val };
+        else if (prefix in expand)
             result = { '@id': (expand[prefix]) + lex.val.substring(prefixIdx + 1) };
         else
             result = { '@id': lex.val };

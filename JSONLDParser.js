@@ -6,19 +6,24 @@ var _ = require('lodash');
 var Util = require('./Util');
 var format = require('util').format;
 var N3Lexer = require('./N3Lexer');
+var N3Parser = require('./N3Parser');
 
 function JSONLDParser () {}
 
 // used to make sure URIs are still valid after simplification
 JSONLDParser.suffixTest = new RegExp('^' + N3Lexer._suffix.source + '$');
 
-JSONLDParser.prototype.toN3 = function (jsonld, baseURI)
+JSONLDParser.prototype.toN3 = function (jsonld)
 {
     var idMap = {};
     var context = _.cloneDeep(jsonld['@context']) || {};
     context['_'] = '_';
-    if (baseURI)
-        context[''] = baseURI;
+    // TODO: what if there is also a base prefix in deeper contexts?
+    if (context[N3Parser.BASE])
+    {
+        context[''] = context[N3Parser.BASE];
+        delete context[N3Parser.BASE];
+    }
     var n3 = this._toN3(jsonld, context, idMap);
 
     // remove root graph
@@ -192,6 +197,8 @@ JSONLDParser.prototype._parseID = function (id, context)
     {
         prefix = id.substring(0, colonIdx);
         suffix = id.substring(colonIdx+1);
+        if (prefix === N3Parser.BASE)
+            prefix = '';
         if ((context[prefix] || prefix === '_') && suffix.substr(0, 2) !== '//')
             return format('%s:%s', prefix, suffix);
     }

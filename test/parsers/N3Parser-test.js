@@ -10,10 +10,12 @@ describe('N3Parser', function ()
     var parser = new N3Parser();
     describe('URIs', function ()
     {
-        it('should be extended for base prefixes', function ()
+        it('should be adapted for base prefixes', function ()
         {
             var jsonld = parser.toJSONLD('PREFIX : <http://example.org/>\n:a :b :c.');
-            var expected = { '@id': 'http://example.org/a', 'http://example.org/b' : { '@id': 'http://example.org/c' } };
+            var expected = { '@context': {}, '@id': N3Parser.BASE + ':a' };
+            expected[N3Parser.BASE + ':b'] = { '@id': N3Parser.BASE + ':c' };
+            expected['@context'][N3Parser.BASE] = 'http://example.org/';
             assert.deepEqual(jsonld, expected);
         });
 
@@ -178,7 +180,9 @@ describe('N3Parser', function ()
         it('should be detected correctly', function ()
         {
             var jsonld = parser.toJSONLD(' # comment1 <\n PREFIX : <http://example.org#>\n :a :b #comment 2 "{[(\n """multistring\n# not a comment!""".');
-            var expected = { '@id': 'http://example.org#a', 'http://example.org#b': 'multistring\n# not a comment!' };
+            var expected = { '@context': {}, '@id': N3Parser.BASE + ':a' };
+            expected['@context'][N3Parser.BASE] = 'http://example.org#';
+            expected[N3Parser.BASE + ':b'] = 'multistring\n# not a comment!';
             assert.deepEqual(jsonld, expected);
         });
     });
