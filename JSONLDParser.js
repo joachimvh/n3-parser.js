@@ -60,8 +60,8 @@ JSONLDParser.prototype._toN3 = function (jsonld, context, idMap)
     if ('@list' in jsonld)
     {
         n3s = _.map(jsonld['@list'], function (thingy) { return this._toN3(thingy, context, idMap); }.bind(this));
-        subject = format('( %s )', _.pluck(n3s, 'statement').join(' '));
-        roots.push.apply(roots, _.flatten(_.filter(_.pluck(n3s, 'triples'))));
+        subject = format('( %s )', _.map(n3s, 'statement').join(' '));
+        roots.push.apply(roots, _.flatten(_.filter(_.map(n3s, 'triples'))));
         if (subject === '(  )')
             subject = '()';
     }

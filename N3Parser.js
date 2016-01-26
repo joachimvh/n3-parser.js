@@ -241,7 +241,7 @@ N3Parser.prototype._simplify = function (jsonld)
         {
             var objects = this._simplify(jsonld[key]);
             if (key === '@type')
-                objects = _.pluck(objects, '@id');
+                objects = _.map(objects, '@id');
 
             if (objects.length === 1 && key !== '@graph' && key !== '@list')
                 objects = objects[0];
@@ -328,7 +328,7 @@ N3Parser.prototype._cleanReferences = function (nodes, reference)
 {
     delete nodes[reference];
     for (var key in nodes)
-        if (_.contains(nodes[key].references, reference))
+        if (_.includes(nodes[key].references, reference))
             this._cleanReferences(nodes, key);
 };
 
@@ -342,7 +342,7 @@ N3Parser.prototype._breakLoops = function (jsonld, parents)
 
     if ('@id' in jsonld)
     {
-        if (_.contains(parents, jsonld['@id']))
+        if (_.includes(parents, jsonld['@id']))
             return { '@id': jsonld['@id'] };
         parents = parents || [];
         parents = parents.concat([jsonld['@id']]);
