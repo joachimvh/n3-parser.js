@@ -22,7 +22,7 @@ N3Lexer._suffix = new RegExp(
     '(?:(?:' + N3Lexer._PN_CHARS.source + '|[.:]|' + N3Lexer._PLX.source + ')*(?:' + N3Lexer._PN_CHARS.source + '|:|' + N3Lexer._PLX.source + '))?'
 );
 N3Lexer._prefixIRI = new RegExp(
-    '(?:' + N3Lexer._prefix.source + ')?:' + N3Lexer._suffix.source
+    '(?:' + N3Lexer._prefix.source + ')?:' + '(?:' + N3Lexer._suffix.source  + ')?'
 );
 N3Lexer._variableRegex = new RegExp(
     '\\?' + N3Lexer._prefix.source

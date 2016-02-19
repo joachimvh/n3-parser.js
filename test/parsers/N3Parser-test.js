@@ -71,6 +71,14 @@ describe('N3Parser', function ()
             expected['@graph'][1][graph[0]['@id']] = {e: 'f'};
             assert.deepEqual(jsonld, expected);
         });
+
+        it('are not required to have a suffix when prefixed', function ()
+        {
+            var jsonld = parser.toJSONLD(': : :.');
+            var expected = { '@id': N3Parser.BASE +':' };
+            expected[N3Parser.BASE + ':'] = { '@id': N3Parser.BASE + ':' };
+            assert.deepEqual(jsonld, expected);
+        });
     });
 
     describe('literals', function ()
