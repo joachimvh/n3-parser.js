@@ -160,9 +160,8 @@ N3Lexer.prototype._expression = function (state)
         var statements = [];
         while (state.firstChar() !== '}')
         {
-            first = state.firstWord();
             statements.push(this._statement(state));
-            if (state.firstChar() !== '.' && first !== 'PREFIX' && first !== 'BASE')
+            if (state.firstChar() === '}') // no final '.'
                 break;
             state.move('.');
         }
