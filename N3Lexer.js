@@ -244,7 +244,7 @@ N3LexerState.prototype.firstWord = function () { return this.input.split(/\s+|([
 N3LexerState.prototype.move = function (part)
 {
     if (!_.startsWith(this.input, part))
-        throw "Unexpected input " + part;
+        throw new Error("Unexpected input " + part);
     this.input = this.input.substring(part.length);
     this.trimLeft();
 };
@@ -253,7 +253,7 @@ N3LexerState.prototype.extract = function (regex)
 {
     var match = (new RegExp('^' + regex.source)).exec(this.input);
     if (!match)
-        throw "Input didn't match the regex.";
+        throw new Error("Input didn't match the regex.");
     this.move(match[0]);
     return match[0];
 };

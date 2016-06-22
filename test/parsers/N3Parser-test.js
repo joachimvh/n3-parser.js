@@ -106,8 +106,8 @@ describe('N3Parser', function ()
 
         it('should support both type and language for strings', function ()
         {
-            var jsonld = parser.toJSONLD('<a> <b> "c"^^xsd:integer.');
-            var expected = { '@id': 'a', b: { '@value': 'c', '@type': 'xsd:integer' } };
+            var jsonld = parser.toJSONLD('@prefix xsd: <http://www.w3.org/2001/XMLSchema#>. <a> <b> "c"^^xsd:integer.');
+            var expected = { '@context': { 'xsd': 'http://www.w3.org/2001/XMLSchema#' }, '@id': 'a', b: { '@value': 'c', '@type': 'xsd:integer' } };
             assert.deepEqual(jsonld, expected);
 
             jsonld = parser.toJSONLD('<a> <b> "c"@en-gb.');
@@ -129,8 +129,9 @@ describe('N3Parser', function ()
             expected = { "@id":"a", "b": 5E5 };
             assert.deepEqual(jsonld, expected);
 
-            jsonld = parser.toJSONLD('x:a x:b 5.E3.a:a x:b x:c.');
-            expected = { "@graph": [ { "@id": "x:a", "x:b": 5000 },
+            jsonld = parser.toJSONLD('@prefix x: <http://example.org/x#>. @prefix a: <http://example.org/a#>. x:a x:b 5.E3.a:a x:b x:c.');
+            expected = { "@context": { "a": "http://example.org/a#", "x": "http://example.org/x#" },
+                         "@graph": [ { "@id": "x:a", "x:b": 5000 },
                                      {  "@id": "a:a", "x:b": { "@id": "x:c" } }]} ;
             assert.deepEqual(jsonld, expected);
         });
@@ -150,8 +151,8 @@ describe('N3Parser', function ()
 
         it('should handle all sorts of content', function ()
         {
-            var jsonld = parser.toJSONLD('<a> <b> ( "c" 0 0.1 <c> c:c () {} true ).');
-            var expected = {"@id":"a","b":{"@list":["c",0,0.1,{"@id":"c"},{"@id":"c:c"},{"@list":[]},{"@graph":[]},true]}};
+            var jsonld = parser.toJSONLD('@prefix c: <http://example.org/c#>. <a> <b> ( "c" 0 0.1 <c> c:c () {} true ).');
+            var expected = {"@context": { c: "http://example.org/c#"}, "@id":"a","b":{"@list":["c",0,0.1,{"@id":"c"},{"@id":"c:c"},{"@list":[]},{"@graph":[]},true]}};
             assert.deepEqual(jsonld, expected);
         });
     });

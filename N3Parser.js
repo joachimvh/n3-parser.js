@@ -15,7 +15,9 @@ N3Parser.prototype.toJSONLD = function (input)
 {
     var lexer = new N3Lexer();
     var lex = lexer.parse(input);
-    var jsonld = this._simplify(this._parse(lex));
+
+    var unsafe = this._unsafePrefixes(lex, {});
+    var jsonld = this._simplify(this._parse(lex, null, {}, unsafe));
 
     // do this before removing default graph so everything has at least 1 reference
     this._compact(jsonld);
@@ -31,7 +33,7 @@ N3Parser.prototype.toJSONLD = function (input)
     return jsonld;
 };
 
-N3Parser.prototype._parse = function (lex, root, expand)
+N3Parser.prototype._parse = function (lex, root, context, unsafe)
 {
     if (Util.isLiteral(lex) || _.isArray(lex))
         throw 'Input should be an object.';
@@ -40,21 +42,25 @@ N3Parser.prototype._parse = function (lex, root, expand)
     if (lex.type === 'Document' || lex.type === 'Formula')
     {
         result = {'@context': {}, '@graph': []};
-
-        var unsafe = this._unsafePrefixes(lex, _.assign({}, expand || {}));
-        if (expand && '' in expand)
-            unsafe[''] = expand['']; // delete empty prefix, BASE prefix will be added though
+        var newContext = _.assign({}, context);
 
         for (i = 0; i < lex.val.length; ++i)
         {
             var statement = lex.val[i];
             if (statement.type === 'Prefix')
-                result['@context'][statement.val[0]] = statement.val[1].substring(1, statement.val[1].length - 1);
+            {
+                var uri = statement.val[1].substring(1, statement.val[1].length - 1);
+                result['@context'][statement.val[0]] = uri;
+                newContext[statement.val[0]] = uri;
+            }
             else
-                result['@graph'].push(this._parse(statement, result, unsafe));
+                result['@graph'].push(this._parse(statement, result, newContext, unsafe));
         }
         if (result['@context'][''])
+        {
             result['@context'][N3Parser.BASE] = result['@context'][''];
+            delete result['@context']['']
+        }
         for (var key in unsafe)
             delete result['@context'][key]; // delete unsafe keys from context to prevent confusion
     }
@@ -64,7 +70,7 @@ N3Parser.prototype._parse = function (lex, root, expand)
         if (lex.type === 'TripleData')
         {
             predicateObjects = lex.val[1];
-            result = this._parse(lex.val[0], root, expand);
+            result = this._parse(lex.val[0], root, context, unsafe);
         }
         else
         {
@@ -74,7 +80,7 @@ N3Parser.prototype._parse = function (lex, root, expand)
         for (i = 0; i < predicateObjects.length; ++i)
         {
             var po = predicateObjects[i];
-            var predicate = this._handlePredicate(po.val[0], root, expand);
+            var predicate = this._handlePredicate(po.val[0], root, context, unsafe);
             if (!_.isString(predicate))
             {
                 if ('@id' in predicate)
@@ -84,7 +90,7 @@ N3Parser.prototype._parse = function (lex, root, expand)
                     root['@graph'].push(predicate);
                 predicate = predicate['@id'];
             }
-            var objects = _.map(po.val[1], function (thingy) { return this._parse(thingy, root, expand); }.bind(this));
+            var objects = _.map(po.val[1], function (thingy) { return this._parse(thingy, root, context, unsafe); }.bind(this));
             if (!(predicate in result))
                 result[predicate] = objects;
             else
@@ -92,7 +98,7 @@ N3Parser.prototype._parse = function (lex, root, expand)
         }
     }
     else if (lex.type === 'List')
-        result = { '@list': _.map(lex.val, function (thingy) { return this._parse(thingy, root, expand); }.bind(this)) };
+        result = { '@list': _.map(lex.val, function (thingy) { return this._parse(thingy, root, context, unsafe); }.bind(this)) };
     else if (lex.type === 'RDFLiteral')
     {
         var str = lex.val[0];
@@ -104,7 +110,7 @@ N3Parser.prototype._parse = function (lex, root, expand)
         str = this._numericEscape(this._stringEscape(str));
         result = { '@value': str };
 
-        if (type) result['@type'] = [this._parse(type, root, expand)]; // array to stay consistent with rest of jsonld generation
+        if (type) result['@type'] = [this._parse(type, root, context, unsafe)]; // array to stay consistent with rest of jsonld generation
         else if (lang) result['@language'] = lang;
     }
     else if (lex.type === 'BooleanLiteral')
@@ -121,24 +127,30 @@ N3Parser.prototype._parse = function (lex, root, expand)
         var prefix = lex.val.substring(0, prefixIdx);
         if (prefix === '')
             result = { '@id': N3Parser.BASE + lex.val };
-        else if (prefix in expand)
-            result = { '@id': (expand[prefix]) + lex.val.substring(prefixIdx + 1) };
-        else
+        else if (prefix === '_')
             result = { '@id': lex.val };
+        else if (unsafe[prefix] && context[prefix])
+            result = { '@id': context[prefix] + lex.val.substring(prefixIdx + 1) };
+        else
+        {
+            if (!context[prefix])
+                throw new Error('unknown prefix ' + prefix);
+            result = { '@id': lex.val}
+        }
     }
     else throw 'Unsupported type or should have been handled in one of the other cases: ' + lex.type;
 
     return result;
 };
 
-N3Parser.prototype._handlePredicate = function (lex, root, expand)
+N3Parser.prototype._handlePredicate = function (lex, root, context, unsafe)
 {
     if (Util.isLiteral(lex) || _.isArray(lex))
         throw 'Input should be an object.';
 
     var result;
     if (lex.type === 'ExplicitIRI' || lex.type === 'PrefixedIRI')
-        result = this._parse(lex, root, expand)['@id'];
+        result = this._parse(lex, root, context, unsafe)['@id'];
     else if (lex.type === 'SymbolicIRI')
     {
         switch (lex.val)
@@ -152,7 +164,7 @@ N3Parser.prototype._handlePredicate = function (lex, root, expand)
         }
     }
     else
-        result = this._parse(lex, root, expand);
+        result = this._parse(lex, root, context, unsafe);
 
     return result;
 };
@@ -191,28 +203,30 @@ N3Parser.prototype._numericEscape = function (str)
 };
 
 // Warning: will modify the context object
-N3Parser.prototype._unsafePrefixes = function (lex, context)
+N3Parser.prototype._unsafePrefixes = function (lex, result, context)
 {
+    result = result || {};
+    context = context || {};
     if (Util.isLiteral(lex) || !lex) return {};
-    if (_.isArray(lex)) return _.assign.apply(_, _.map(lex, function (thingy) { return this._unsafePrefixes(thingy, context); }.bind(this)));
-
-    var prefixes = {};
-    if (lex.type === 'Prefix')
+    if (_.isArray(lex))
     {
-        context[lex.val[0]] = lex.val[1].substring(1, lex.val[1].length - 1);
-        if (lex.val[0] === '') // always expand base prefix
-            prefixes[''] = context[''];
+        for (var i = 0; i < lex.length; ++i)
+            this._unsafePrefixes(lex[i], result, context);
+        return result;
     }
 
-    _.assign(prefixes, this._unsafePrefixes(lex.val, context));
+    if (lex.type === 'Prefix')
+        context[lex.val[0]] = lex.val[1].substring(1, lex.val[1].length - 1);
+
+    this._unsafePrefixes(lex.val, result, context);
     if (lex.type === 'ExplicitIRI')
     {
         var prefixIdx = lex.val.indexOf(':');
         var prefix = lex.val.substring(1, prefixIdx); // 1, since '<' is still there
         if (prefix in context && lex.val.substr(prefixIdx, 3) !== '://')
-            prefixes[prefix] = context[prefix];
+            result[prefix] = context[prefix];
     }
-    return prefixes;
+    return result;
 };
 
 // TODO: reserved escape
