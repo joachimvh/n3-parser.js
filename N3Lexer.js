@@ -63,9 +63,9 @@ N3Lexer.prototype._statement = function (state)
 {
     var first = state.firstWord();
     var result;
-    if (first === '@forAll') return; // TODO
-    else if (first === '@forSome') return; // TODO
-    else if (first === '@base' || first === 'BASE') return; // TODO
+    if (first === '@forAll') throw new Error('@forAll is not supported yet.'); // TODO
+    else if (first === '@forSome') throw new Error('@forSome is not supported yet.'); // TODO
+    else if (first === '@base' || first === 'BASE') throw new Error('@base is not supported yet.'); // TODO
     else if (first === '@prefix' || first === 'PREFIX')
     {
         state.move(first);
@@ -78,7 +78,7 @@ N3Lexer.prototype._statement = function (state)
         var iri = state.extract(N3Lexer._iriRegex);
         result = { type: 'Prefix', val: [ prefix, iri ]};
     }
-    else if (first === '@keywords') return; // TODO
+    else if (first === '@keywords') throw new Error('@keywords is not supported yet.'); // TODO
     else
         result = { type: 'TripleData', val: [ this._subject(state), this._propertylist(state) ] };
     return result;
@@ -116,8 +116,8 @@ N3Lexer.prototype._predicate = function (state)
     var first = state.firstWord();
 
     var result;
-    if (first === '@has') return; // TODO
-    else if (first === '@is') return; // TODO
+    if (first === '@has') throw new Error('@has is not supported yet.'); // TODO
+    else if (first === '@is') throw new Error('@is is not supported yet.'); // TODO
     else if (first === '@a' || first === 'a')
     {
         result = { type: 'SymbolicIRI', val: first};
@@ -229,8 +229,8 @@ N3Lexer.prototype._expression = function (state)
     }
 
     c = state.firstChar();
-    if (c === '!') return; // TODO
-    else if (c === '^') return; // TODO
+    if (c === '!') throw new Error('! is not supported yet.'); // TODO
+    else if (c === '^') throw new Error('^ is not supported yet.'); // TODO
 
     return result;
 };
