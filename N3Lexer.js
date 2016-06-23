@@ -242,7 +242,7 @@ N3Lexer._wordRegex = /\s+|([;.,{}[\]()!^])|(<?=>?)/;
 N3LexerState.prototype.trimLeft   = function ()      { this.input = this.input.replace(N3Lexer._trimRegex, ''); };
 N3LexerState.prototype.firstChar  = function ()      { return this.input[0]; };
 N3LexerState.prototype.firstChars = function (count) { if (!count || count === 1) return this.input[0]; return this.input.substr(0, count); };
-N3LexerState.prototype.firstWord  = function ()      { return this.input.split(N3Lexer._wordRegex, 1).filter(Boolean)[0]; };
+N3LexerState.prototype.firstWord  = function ()      { return this.input.split(N3Lexer._wordRegex, 1)[0]; };
 N3LexerState.prototype.eof        = function ()      { return this.input.length === 0; };
 
 N3LexerState.prototype.move = function (part)
