@@ -255,7 +255,7 @@ N3LexerState.prototype.move = function (part)
 
 N3LexerState.prototype.extract = function (regex)
 {
-    var match = (regex).exec(this.input);
+    var match = regex.exec(this.input);
     if (!match || regex.lastIndex !== 0)
         throw new Error("Input didn't match the regex.");
     this.move(match[0]);
