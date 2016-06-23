@@ -89,11 +89,12 @@ N3Lexer.prototype._subject = function (state)
     return this._expression(state);
 };
 
+N3Lexer._delimiterRegex = /[.\]})]/;
 N3Lexer.prototype._propertylist = function (state)
 {
     // propertylist can be empty!
     var c = state.firstChar();
-    if (/[.\]})]/.exec(c))
+    if (N3Lexer._delimiterRegex.exec(c))
         return [];
     var propertyLists = [{ type: 'PredicateObject', val: [ this._predicate(state), this._objects(state) ] }];
     while (state.firstChar() === ';')
@@ -102,7 +103,7 @@ N3Lexer.prototype._propertylist = function (state)
         while (state.firstChar() === ';')
             state.move(';');
         // propertylist can end on a semicolon...
-        if (/[.\]})]/.exec(state.firstChar()))
+        if (N3Lexer._delimiterRegex.exec(state.firstChar()))
             break;
         propertyLists.push({ type: 'PredicateObject', val: [ this._predicate(state), this._objects(state) ] });
     }
