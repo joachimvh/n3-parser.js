@@ -269,140 +269,63 @@ N3Parser.prototype._simplify = function (jsonld)
     return result;
 };
 
-N3Parser.prototype._compact = function (jsonld)
+N3Parser.prototype._compact = function (jsonld, references)
 {
-    if (Util.isLiteral(jsonld))
-        return;
-    if (!('@graph' in jsonld))
-        return _.each(jsonld, function (thingy) { this._compact(thingy); }.bind(this));
-
-    var nodes = {};
-    this._findReferences(jsonld['@graph'], nodes);
-    this._expand(jsonld['@graph'], nodes);
-    jsonld['@graph'] = _.uniq(jsonld['@graph'], false, function (thingy) { return thingy['@id'] || uuid.v4(); });
-
-    // elements don't have to be in the root of a graph if they are already referenced somewhere else in the graph
-    var newGraph = [];
-    for (var i = 0; i < jsonld['@graph'].length; ++i)
-    {
-        var thingy = jsonld['@graph'][i];
-        var id = thingy['@id'];
-        if (!id || (id in nodes && nodes[id].references.length === 0))
-        {
-            newGraph.push(thingy);
-            if (id)
-                this._cleanReferences(nodes, id);
-        }
-    }
-    // there are some nodes left, meaning there is a loop in there somewhere
-    if (Object.keys(nodes).length > 0)
-    {
-        while (Object.keys(nodes).length > 0)
-        {
-            var key = Object.keys(nodes)[0];
-            // if 'nothing' is referencing the node, but it wasn't added it means it was referenced by a blank node probably
-            if (nodes[key].references.length > 0)
-                newGraph.push(nodes[key].node);
-            this._cleanReferences(nodes, key);
-        }
-        newGraph = this._breakLoops(newGraph);
-    }
-    jsonld['@graph'] = newGraph;
-    this._compact(newGraph);
-};
-
-N3Parser.prototype._findReferences = function (jsonld, nodes, parent)
-{
-    if (Util.isLiteral(jsonld))
+    if (Util.isLiteral(jsonld) || !jsonld)
         return;
     if (_.isArray(jsonld))
-        return _.each(jsonld, function (thingy) { this._findReferences(thingy, nodes, parent); }.bind(this));
+        return _.each(jsonld, function (thingy) { this._compact(thingy, references); }.bind(this));
 
+    var key;
     if ('@id' in jsonld)
     {
         var id = jsonld['@id'];
-        if (!(id in nodes))
-            nodes[id] = { node: jsonld, references: [] };
+        if (id in references)
+        {
+            this._mergeNodes(references[id], jsonld);
+            jsonld['@type'] = null;
+        }
         else
-            nodes[id].node = this._mergeNodes(nodes[id].node, jsonld);
-        if (parent && nodes[id].references.indexOf(parent) < 0)
-            nodes[id].references.push(parent);
-        parent = id;
+            references[id] = jsonld;
     }
-
-    if ('@graph' in jsonld)
-        return;
 
     // adding the predicates would only be necessary if we delete the blank node @ids
-    for (var key in jsonld)
-        this._findReferences(jsonld[key], nodes, parent);
-};
-
-N3Parser.prototype._cleanReferences = function (nodes, reference)
-{
-    delete nodes[reference];
-    for (var key in nodes)
-        if (_.includes(nodes[key].references, reference))
-            this._cleanReferences(nodes, key);
-};
-
-N3Parser.prototype._breakLoops = function (jsonld, parents)
-{
-    if (Util.isLiteral(jsonld) || '@graph' in jsonld)
-        return jsonld;
-
-    if (_.isArray(jsonld))
-        return _.map(jsonld, function (thingy) { return this._breakLoops(thingy, parents); }.bind(this));
-
-    if ('@id' in jsonld)
+    for (key in jsonld)
     {
-        if (_.includes(parents, jsonld['@id']))
-            return { '@id': jsonld['@id'] };
-        parents = parents || [];
-        parents = parents.concat([jsonld['@id']]);
-    }
-    var result = {};
-    for (var key in jsonld)
-        result[key] = this._breakLoops(jsonld[key], parents);
-    return result;
-};
+        this._compact(jsonld[key], key === '@graph' ? {} : references);
 
-N3Parser.prototype._expand = function (jsonld, nodes)
-{
-    if (Util.isLiteral(jsonld))
-        return;
-    if ('@graph' in jsonld)
-        return;
-
-    _.each(jsonld, function (thingy) { this._expand(thingy, nodes); }.bind(this));
-    if (_.isArray(jsonld))
-        return;
-
-    var id = jsonld['@id'];
-    if (id && nodes[id])
-        _.assign(jsonld, nodes[id].node);
-};
-
-N3Parser.prototype._deflate = function (jsonld, nodes)
-{
-    if (Util.isLiteral(jsonld))
-        return;
-    if ('@graph' in jsonld)
-        return;
-
-    _.each(jsonld, function (thingy) { this._deflate(thingy, nodes); }.bind(this));
-    if (_.isArray(jsonld))
-        return;
-
-    var id = jsonld['@id'];
-    if (id)
-    {
-        if (nodes[id])
-            delete nodes[id];
-        else
-            for (var key in jsonld)
-                if (key !== '@id')
-                    delete jsonld[key];
+        if (key === '@list')
+        {
+            jsonld[key] = _.map(jsonld[key], function (node)
+            {
+                if (_.isObject(node) && node['@type'] === null)
+                    return { '@id': node['@id']};
+                return node;
+            });
+        }
+        else if (_.isArray(jsonld[key]))
+        {
+            var acc = {};
+            var list = _.filter(_.map(jsonld[key], function (node)
+            {
+                // can't delete if it's the only reference
+                if (node['@id'] && !acc[node['@id']] && key !== '@graph')
+                {
+                    acc[node['@id']] = true;
+                    if (node['@type'] === null)
+                        return { '@id': node['@id']};
+                }
+                return node['@type'] === null ? null : node;
+            }));
+            if (list.length === 0 && key !== '@graph')      delete jsonld[key];
+            else if (list.length === 1 && key !== '@graph') jsonld[key] = list[0]; // @graph always expects a list for its parameters
+            else                                            jsonld[key] = list;
+        }
+        else if (_.isObject(jsonld[key]) && jsonld[key]['@type'] === null)
+            // need to modify object in place to make sure all references are correct
+            for (var subKey in jsonld[key])
+                if (subKey !== '@id')
+                    delete jsonld[key][subKey];
     }
 };
 
@@ -419,7 +342,10 @@ N3Parser.prototype._mergeNodes = function (objectA, objectB)
     }
 
     if (_.isArray(objectA) && _.isArray(objectB))
-        return objectA.concat(objectB);
+    {
+        Array.prototype.push.apply(objectA, objectB);
+        return objectA;
+    }
 
     var idA = objectA['@id'];
     var idB = objectB['@id'];
@@ -427,8 +353,7 @@ N3Parser.prototype._mergeNodes = function (objectA, objectB)
         return [objectA, objectB];
 
     // 2 objects
-    var result = {};
-    var keys = _.union(Object.keys(objectA), Object.keys(objectB));
+    var keys = Object.keys(objectB);
     for (i = 0; i < keys.length; ++i)
     {
         var key = keys[i];
@@ -436,18 +361,15 @@ N3Parser.prototype._mergeNodes = function (objectA, objectB)
         {
             if (objectA[key] !== objectB[key])
                 throw "Unable to merge 2 objects with different IDs.";
-            result[key] = objectA[key];
             continue;
         }
 
         if (objectA[key] !== undefined && objectB[key] !== undefined)
-            result[key] = this._mergeNodes(objectA[key], objectB[key]);
-        else if (objectA[key] !== undefined)
-            result[key] = objectA[key];
+            objectA[key] = this._mergeNodes(objectA[key], objectB[key]);
         else if (objectB[key] !== undefined)
-            result[key] = objectB[key];
+            objectA[key] = objectB[key];
     }
-    return result;
+    return objectA;
 };
 
 module.exports = N3Parser;
