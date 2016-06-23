@@ -17,7 +17,9 @@ N3Parser.prototype.toJSONLD = function (input)
     var lex = lexer.parse(input);
 
     var unsafe = this._unsafePrefixes(lex, {});
-    var jsonld = this._simplify(this._parse(lex, null, {}, unsafe));
+    var jsonld = this._parse(lex, null, {}, unsafe);
+
+    jsonld = this._simplify(jsonld);
 
     // do this before removing default graph so everything has at least 1 reference
     this._compact(jsonld);
@@ -254,6 +256,8 @@ N3Parser.prototype._simplify = function (jsonld)
         else
         {
             var objects = this._simplify(jsonld[key]);
+            if (!_.isArray(objects))
+                objects = [objects];
             if (key === '@type')
                 objects = _.map(objects, '@id');
 
