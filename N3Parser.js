@@ -44,7 +44,9 @@ N3Parser.prototype._parse = function (lex, root, context, unsafe)
     if (lex.type === 'Document' || lex.type === 'Formula')
     {
         result = {'@context': {}, '@graph': []};
-        var newContext = _.assign({}, context);
+        var newContext = {};
+        for (var c in context)
+            newContext[c] = context[c];
 
         for (i = 0; i < lex.val.length; ++i)
         {
