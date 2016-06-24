@@ -241,19 +241,22 @@ N3Parser.prototype._simplify = function (jsonld)
         return jsonld;
 
     if (_.isArray(jsonld))
-        return _.map(jsonld, this._simplify.bind(this));
+    {
+        for (var i = 0; i < jsonld.length; ++i)
+            jsonld[i] = this._simplify(jsonld[i]);
+        return jsonld;
+    }
 
     var keys = Object.keys(jsonld);
     if (keys.length === 1 && keys[0] === '@value')
         return jsonld['@value'];
 
-    var result = {};
     for (var key in jsonld)
     {
         if (key === '@context')
         {
             if (Object.keys(jsonld[key]).length > 0)
-                result[key] = this._simplify(jsonld[key]);
+                jsonld[key] = this._simplify(jsonld[key]);
         }
         else
         {
@@ -265,14 +268,14 @@ N3Parser.prototype._simplify = function (jsonld)
 
             if (objects.length === 1 && key !== '@graph' && key !== '@list')
                 objects = objects[0];
-            result[key] = objects;
+            jsonld[key] = objects;
         }
     }
     // this is a special case where we have literals as triples without predicates in the graph root
-    if ('@graph' in result)
-        result['@graph'] = _.map(result['@graph'], function (thingy) { if (Util.isLiteral(thingy)) return { '@value': thingy}; return thingy; });
+    if ('@graph' in jsonld)
+        jsonld['@graph'] = _.map(jsonld['@graph'], function (thingy) { if (Util.isLiteral(thingy)) return { '@value': thingy}; return thingy; });
 
-    return result;
+    return jsonld;
 };
 
 N3Parser.prototype._compact = function (jsonld, references)
