@@ -67,6 +67,8 @@ N3Parser.prototype._parse = function (lex, root, context, unsafe)
         }
         for (var key in unsafe)
             delete result['@context'][key]; // delete unsafe keys from context to prevent confusion
+        if (_.isEmpty(result['@context']))
+            delete result['@context'];
     }
     else if (lex.type === 'TripleData' || lex.type === 'BlankTripleData')
     {
