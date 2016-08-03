@@ -369,11 +369,7 @@ N3Parser.prototype._mergeNodes = function (objectA, objectB)
     {
         var key = keys[i];
         if (key === '@id')
-        {
-            if (objectA[key] !== objectB[key])
-                throw "Unable to merge 2 objects with different IDs.";
             continue;
-        }
 
         if (objectA[key] !== undefined && objectB[key] !== undefined)
             objectA[key] = this._mergeNodes(objectA[key], objectB[key]);
