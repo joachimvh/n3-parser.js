@@ -1,0 +1,21 @@
+{
+  "name": "n3parser",
+  "version": "0.0.1",
+  "description": "N3 parser",
+  "repository": {
+    "type": "git",
+    "url": "git@git.mmlab.be:4444/jvherweg/n3parser.git"
+  },
+  "main": "index.js",
+  "dependencies": {
+    "lodash": "^4.0.0",
+    "node-uuid": "^1.4.3"
+  },
+  "devDependencies": {
+    "mocha": "^2.3.4"
+  },
+  "scripts": {
+    "test": "mocha"
+  },
+  "author": ""
+}
