@@ -63,8 +63,16 @@ N3Lexer.prototype._statement = function (state)
 {
     var first = state.firstWord();
     var result;
-    if (first === '@forAll') throw new Error('@forAll is not supported yet.'); // TODO
-    else if (first === '@forSome') throw new Error('@forSome is not supported yet.'); // TODO
+    if (first === '@forAll')
+    {
+        state.move(first);
+        result = { type: 'Universal', val: this._objects(state) };
+    }
+    else if (first === '@forSome')
+    {
+        state.move(first);
+        result = { type: 'Existential', val: this._objects(state) };
+    }
     else if (first === '@base' || first === 'BASE') throw new Error('@base is not supported yet.'); // TODO
     else if (first === '@prefix' || first === 'PREFIX')
     {
