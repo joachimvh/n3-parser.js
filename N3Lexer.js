@@ -142,8 +142,8 @@ N3Lexer.prototype._predicate = function (state)
         result = { type: 'SymbolicIRI', val: c2};
         state.move(c, true);
     }
-    else if (first === '@has') throw new Error('@has is not supported yet.'); // TODO
-    else if (first === '@is') throw new Error('@is is not supported yet.'); // TODO
+    else if (c2 === '@h') throw new Error('@has is not supported yet.'); // TODO
+    else if (c2 === '@i') throw new Error('@is is not supported yet.'); // TODO
     else result = this._expression(state);
 
     return result;
