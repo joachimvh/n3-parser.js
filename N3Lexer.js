@@ -73,7 +73,6 @@ N3Lexer.prototype._statement = function (state)
         state.move(first);
         result = { type: 'Existential', val: this._objects(state) };
     }
-    else if (first === '@base' || first === 'BASE') throw new Error('@base is not supported yet.'); // TODO
     else if (first === '@prefix' || first === 'PREFIX')
     {
         state.move(first);
@@ -86,6 +85,7 @@ N3Lexer.prototype._statement = function (state)
         var iri = state.extract(N3Lexer._iriRegex);
         result = { type: 'Prefix', val: [ prefix, iri ]};
     }
+    else if (first === '@base' || first === 'BASE') throw new Error('@base is not supported yet.'); // TODO
     else if (first === '@keywords') throw new Error('@keywords is not supported yet.'); // TODO
     else
         result = { type: 'TripleData', val: [ this._subject(state), this._propertylist(state) ] };
@@ -122,13 +122,11 @@ N3Lexer.prototype._predicate = function (state)
 {
     var c = state.firstChar();
     var c2 = state.firstChars(2);
-    var first = state.firstWord();
 
     var result;
-    if (first === '@has') throw new Error('@has is not supported yet.'); // TODO
-    else if (first === '@is') throw new Error('@is is not supported yet.'); // TODO
-    else if (first === '@a' || first === 'a')
+    if (c2 === '@a' || c === 'a')
     {
+        var first = state.firstWord();
         result = { type: 'SymbolicIRI', val: first};
         state.move(first);
     }
@@ -142,6 +140,8 @@ N3Lexer.prototype._predicate = function (state)
         result = { type: 'SymbolicIRI', val: c2};
         state.move(c);
     }
+    else if (first === '@has') throw new Error('@has is not supported yet.'); // TODO
+    else if (first === '@is') throw new Error('@is is not supported yet.'); // TODO
     else result = this._expression(state);
 
     return result;
@@ -161,7 +161,6 @@ N3Lexer.prototype._objects = function (state)
 N3Lexer.prototype._expression = function (state)
 {
     var c = state.firstChar();
-    var first = state.firstWord();
     var result, match;
     if (c === '{')
     {
@@ -216,8 +215,9 @@ N3Lexer.prototype._expression = function (state)
 
         result = { type: 'RDFLiteral', val: [str, type, lang] };
     }
-    else if (first === 'true' || first === 'false' || first === '@true' || first === '@false')
+    else if (state.startsWith('true') || state.startsWith('false') || state.startsWith('@true') || state.startsWith('@false'))
     {
+        var first = state.firstWord();
         result = { type: 'BooleanLiteral', val: first };
         state.move(first);
     }
@@ -253,12 +253,18 @@ N3LexerState.prototype.firstChar  = function ()      { return this.input[0]; };
 N3LexerState.prototype.firstChars = function (count) { if (!count || count === 1) return this.input[0]; return this.input.substr(0, count); };
 N3LexerState.prototype.firstWord  = function ()      { return this.input.split(N3Lexer._wordRegex, 1)[0]; };
 N3LexerState.prototype.eof        = function ()      { return this.input.length === 0; };
+N3LexerState.prototype.startsWith = function (match) { return this.input.startsWith(match); };
 
 N3LexerState.prototype.move = function (part)
 {
-    if (!_.startsWith(this.input, part))
+    if (!this.input.startsWith(part))
         throw new Error("Unexpected input " + part);
-    this.input = this.input.substring(part.length);
+    this.moveLength(part.length);
+};
+
+N3LexerState.prototype.moveLength = function (length)
+{
+    this.input = this.input.substring(length);
     this.trimLeft();
 };
 
