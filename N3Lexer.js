@@ -220,8 +220,12 @@ N3Lexer.prototype._expression = function (state)
     }
     else if (c === '<')
     {
-        match = state.extract(N3Lexer._iriRegex);
-        result = { type: 'ExplicitIRI', val: match };
+        var idx = state.input.indexOf('>');
+        if (idx < 0)
+            throw new Error('URI closing bracket not found');
+        var iri = state.input.substring(0, idx+1);
+        state.moveLength(idx+1);
+        result = { type: 'ExplicitIRI', val: iri };
     }
     else
     {
