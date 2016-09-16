@@ -69,17 +69,17 @@ N3Lexer.prototype._statement = function (state)
         var first = state.firstWord();
         if (first === '@forAll')
         {
-            state.move(first);
+            state.move(first, true);
             result = { type: 'Universal', val: this._objects(state) };
         }
         else if (first === '@forSome')
         {
-            state.move(first);
+            state.move(first, true);
             result = { type: 'Existential', val: this._objects(state) };
         }
         else if (first === '@prefix' || first === 'PREFIX')
         {
-            state.move(first);
+            state.move(first, true);
             var prefix;
             if (state.firstChar() === ':')
                 prefix = '';
@@ -115,7 +115,7 @@ N3Lexer.prototype._propertylist = function (state)
     {
         // you can have multiple semicolons...
         while (state.firstChar() === ';')
-            state.move(';');
+            state.move(';', true);
         // propertylist can end on a semicolon...
         if (N3Lexer._delimiterRegex.exec(state.firstChar()))
             break;
@@ -134,17 +134,17 @@ N3Lexer.prototype._predicate = function (state)
     {
         var first = state.firstWord();
         result = { type: 'SymbolicIRI', val: first};
-        state.move(first);
+        state.move(first, true);
     }
     else if (c === '=' && c2 == '=>' || c2 === '<=')
     {
         result = { type: 'SymbolicIRI', val: c2};
-        state.move(c2);
+        state.move(c2, true);
     }
     else if (c === '=')
     {
         result = { type: 'SymbolicIRI', val: c2};
-        state.move(c);
+        state.move(c, true);
     }
     else if (first === '@has') throw new Error('@has is not supported yet.'); // TODO
     else if (first === '@is') throw new Error('@is is not supported yet.'); // TODO
@@ -158,7 +158,7 @@ N3Lexer.prototype._objects = function (state)
     var objects = [this._expression(state)];
     while (state.firstChar() === ',')
     {
-        state.move(',');
+        state.move(',', true);
         objects.push(this._expression(state));
     }
     return objects;
@@ -170,7 +170,7 @@ N3Lexer.prototype._expression = function (state)
     var result, match;
     if (c === '{')
     {
-        state.move(c);
+        state.move(c, true);
         var statements = [];
         while (state.firstChar() !== '}')
         {
@@ -184,7 +184,7 @@ N3Lexer.prototype._expression = function (state)
     }
     else if (c === '[')
     {
-        state.move(c);
+        state.move(c, true);
         var propertyList;
         if (state.firstChar() === ']')
             propertyList = [];
@@ -195,7 +195,7 @@ N3Lexer.prototype._expression = function (state)
     }
     else if (c === '(')
     {
-        state.move(c);
+        state.move(c, true);
         var expressions = [];
         while (state.firstChar() !== ')')
             expressions.push(this._expression(state));
@@ -238,7 +238,7 @@ N3Lexer.prototype._expression = function (state)
         if (first === 'true' || first === 'false' || first === '@true' || first === '@false')
         {
             result = { type: 'BooleanLiteral', val: first };
-            state.move(first);
+            state.move(first, true);
         }
         else
         {
@@ -283,7 +283,7 @@ N3LexerState.prototype.extract = function (regex)
     var match = regex.exec(this.input);
     if (!match || regex.lastIndex !== 0)
         throw new Error("Input didn't match the regex.");
-    this.move(match[0]);
+    this.move(match[0], true);
     return match[0];
 };
 
