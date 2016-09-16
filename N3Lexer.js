@@ -30,12 +30,12 @@ N3Lexer._variableRegex = new RegExp(
 N3Lexer._iriRegex = /^<[^>]*>/;
 N3Lexer._stringRegex = /^("|')(\1\1)?(?:[^]*?[^\\])??(?:\\\\)*\2\1/;
 N3Lexer._datatypeRegex = new RegExp(
-    '^\\^\\^(?:(?:' + N3Lexer._iriRegex.source.substring(1) + ')|(?:' + N3Lexer._prefixIRI.source.substring(1) + '))'
+    '\\^\\^(?:(?:' + N3Lexer._iriRegex.source.substring(1) + ')|(?:' + N3Lexer._prefixIRI.source.substring(1) + '))'
 );
-N3Lexer._langRegex = /^@[a-z]+(-[a-z0-9]+)*/;
+N3Lexer._langRegex = /@[a-z]+(-[a-z0-9]+)*/;
 N3Lexer._literalRegex = new RegExp(
     N3Lexer._stringRegex.source +
-    '((?:' + N3Lexer._datatypeRegex.source.substring(1) + ')|(?:' + N3Lexer._langRegex.source.substring(1) + '))?'
+    '((?:' + N3Lexer._datatypeRegex.source + ')|(?:' + N3Lexer._langRegex.source + '))?'
 );
 N3Lexer._numericalRegex = /^[-+]?(?:(?:(?:(?:[0-9]+\.?[0-9]*)|(?:\.[0-9]+))[eE][-+]?[0-9]+)|(?:[0-9]*(\.[0-9]+))|(?:[0-9]+))/;
 
@@ -64,7 +64,7 @@ N3Lexer.prototype._statement = function (state)
 {
     var c = state.firstChar();
     var result;
-    if (c === '@')
+    if (c === '@' || c ==='P' || c === 'B')
     {
         var first = state.firstWord();
         if (first === '@forAll')
