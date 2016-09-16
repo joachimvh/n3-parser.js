@@ -9,35 +9,35 @@ function N3Lexer () {}
 
 // TODO: check up what reserved escapes are supposed to do http://www.w3.org/TR/turtle/#sec-escapes
 // TODO: 32 bit unicode (use something like http://apps.timwhitlock.info/js/regex# ? or use xregexp with https://gist.github.com/slevithan/2630353 )
-N3Lexer._PN_CHARS_BASE = /[A-Z_a-z\u00c0-\u00d6\u00d8-\u00f6\u00f8-\u02ff\u0370-\u037d\u037f-\u1fff\u200c-\u200d\u2070-\u218f\u2c00-\u2fef\u3001-\ud7ff\uf900-\ufdcf\ufdf0-\ufffd]/;
-N3Lexer._PN_CHARS_U = new RegExp('(?:' + N3Lexer._PN_CHARS_BASE.source + '|_)');
-N3Lexer._PN_CHARS = new RegExp('(?:' + N3Lexer._PN_CHARS_U.source + '|' + /[-0-9\u00b7\u0300-\u036f\u203f-\u2040]/.source + ')');
-N3Lexer._PLX = /(?:%[0-9a-fA-F]{2})|(?:\\[-_~.!$&'()*+,;=/?#@%])/;
+N3Lexer._PN_CHARS_BASE = /^[A-Z_a-z\u00c0-\u00d6\u00d8-\u00f6\u00f8-\u02ff\u0370-\u037d\u037f-\u1fff\u200c-\u200d\u2070-\u218f\u2c00-\u2fef\u3001-\ud7ff\uf900-\ufdcf\ufdf0-\ufffd]/;
+N3Lexer._PN_CHARS_U = new RegExp('^(?:' + N3Lexer._PN_CHARS_BASE.source.substring(1) + '|_)');
+N3Lexer._PN_CHARS = new RegExp('^(?:' + N3Lexer._PN_CHARS_U.source.substring(1) + '|' + /[-0-9\u00b7\u0300-\u036f\u203f-\u2040]/.source + ')');
+N3Lexer._PLX = /^(?:%[0-9a-fA-F]{2})|(?:\\[-_~.!$&'()*+,;=/?#@%])/;
 // using _U instead of _BASE to also match blank nodes
 N3Lexer._prefix = new RegExp(
-    N3Lexer._PN_CHARS_U.source + '(?:(?:' + N3Lexer._PN_CHARS.source + '|\\.)*' + N3Lexer._PN_CHARS.source + ')?'
+    N3Lexer._PN_CHARS_U.source + '(?:(?:' + N3Lexer._PN_CHARS.source.substring(1) + '|\\.)*' + N3Lexer._PN_CHARS.source.substring(1) + ')?'
 );
 N3Lexer._suffix = new RegExp(
-    '(?:' + N3Lexer._PN_CHARS_U.source + '|[:0-9]|' + N3Lexer._PLX.source + ')' +
-    '(?:(?:' + N3Lexer._PN_CHARS.source + '|[.:]|' + N3Lexer._PLX.source + ')*(?:' + N3Lexer._PN_CHARS.source + '|:|' + N3Lexer._PLX.source + '))?'
+    '^(?:' + N3Lexer._PN_CHARS_U.source.substring(1) + '|[:0-9]|' + N3Lexer._PLX.source.substring(1) + ')' +
+    '(?:(?:' + N3Lexer._PN_CHARS.source.substring(1) + '|[.:]|' + N3Lexer._PLX.source.substring(1) + ')*(?:' + N3Lexer._PN_CHARS.source.substring(1) + '|:|' + N3Lexer._PLX.source.substring(1) + '))?'
 );
 N3Lexer._prefixIRI = new RegExp(
-    '(?:' + N3Lexer._prefix.source + ')?:' + '(?:' + N3Lexer._suffix.source  + ')?'
+    '^(?:' + N3Lexer._prefix.source.substring(1) + ')?:' + '(?:' + N3Lexer._suffix.source.substring(1)  + ')?'
 );
 N3Lexer._variableRegex = new RegExp(
-    '\\?' + N3Lexer._prefix.source
+    '^\\?' + N3Lexer._prefix.source.substring(1)
 );
-N3Lexer._iriRegex = /<[^>]*>/;
-N3Lexer._stringRegex = /("|')(\1\1)?(?:[^]*?[^\\])??(?:\\\\)*\2\1/;
+N3Lexer._iriRegex = /^<[^>]*>/;
+N3Lexer._stringRegex = /^("|')(\1\1)?(?:[^]*?[^\\])??(?:\\\\)*\2\1/;
 N3Lexer._datatypeRegex = new RegExp(
-    '\\^\\^(?:(?:' + N3Lexer._iriRegex.source + ')|(?:' + N3Lexer._prefixIRI.source + '))'
+    '^\\^\\^(?:(?:' + N3Lexer._iriRegex.source.substring(1) + ')|(?:' + N3Lexer._prefixIRI.source.substring(1) + '))'
 );
-N3Lexer._langRegex = /@[a-z]+(-[a-z0-9]+)*/;
+N3Lexer._langRegex = /^@[a-z]+(-[a-z0-9]+)*/;
 N3Lexer._literalRegex = new RegExp(
     N3Lexer._stringRegex.source +
-    '((?:' + N3Lexer._datatypeRegex.source + ')|(?:' + N3Lexer._langRegex.source + '))?'
+    '((?:' + N3Lexer._datatypeRegex.source.substring(1) + ')|(?:' + N3Lexer._langRegex.source.substring(1) + '))?'
 );
-N3Lexer._numericalRegex = /[-+]?(?:(?:(?:(?:[0-9]+\.?[0-9]*)|(?:\.[0-9]+))[eE][-+]?[0-9]+)|(?:[0-9]*(\.[0-9]+))|(?:[0-9]+))/;
+N3Lexer._numericalRegex = /^[-+]?(?:(?:(?:(?:[0-9]+\.?[0-9]*)|(?:\.[0-9]+))[eE][-+]?[0-9]+)|(?:[0-9]*(\.[0-9]+))|(?:[0-9]+))/;
 
 N3Lexer.prototype.parse = function (input)
 {
@@ -51,9 +51,10 @@ N3Lexer.prototype._parse = function (state)
     var statements = [];
     while (!state.eof())
     {
-        var first = state.firstWord(); // need this because PREFIX and BASE don't end on a dot
+        var c = state.firstChar();
         statements.push(this._statement(state));
-        if (first !== 'PREFIX' && first !== 'BASE') // TODO: should we check for newlines?
+        // PREFIX and BASE
+        if (c !== 'P' && c !== 'B') // TODO: should we check for newlines?
             state.move('.');
     }
     return { type: 'Document', val: statements };
@@ -61,32 +62,37 @@ N3Lexer.prototype._parse = function (state)
 
 N3Lexer.prototype._statement = function (state)
 {
-    var first = state.firstWord();
+    var c = state.firstChar();
     var result;
-    if (first === '@forAll')
+    if (c === '@')
     {
-        state.move(first);
-        result = { type: 'Universal', val: this._objects(state) };
+        var first = state.firstWord();
+        if (first === '@forAll')
+        {
+            state.move(first);
+            result = { type: 'Universal', val: this._objects(state) };
+        }
+        else if (first === '@forSome')
+        {
+            state.move(first);
+            result = { type: 'Existential', val: this._objects(state) };
+        }
+        else if (first === '@prefix' || first === 'PREFIX')
+        {
+            state.move(first);
+            var prefix;
+            if (state.firstChar() === ':')
+                prefix = '';
+            else
+                prefix = state.extract(N3Lexer._prefix);
+            state.move(':');
+            var iri = state.extract(N3Lexer._iriRegex);
+            result = { type: 'Prefix', val: [prefix, iri] };
+        }
+        else if (first === '@base' || first === 'BASE') throw new Error('@base is not supported yet.'); // TODO
+        else if (first === '@keywords') throw new Error('@keywords is not supported yet.'); // TODO
+        else throw new Error('Unsupported keyword ' + first);
     }
-    else if (first === '@forSome')
-    {
-        state.move(first);
-        result = { type: 'Existential', val: this._objects(state) };
-    }
-    else if (first === '@prefix' || first === 'PREFIX')
-    {
-        state.move(first);
-        var prefix;
-        if (state.firstChar() === ':')
-            prefix = '';
-        else
-            prefix = state.extract(N3Lexer._prefix);
-        state.move(':');
-        var iri = state.extract(N3Lexer._iriRegex);
-        result = { type: 'Prefix', val: [ prefix, iri ]};
-    }
-    else if (first === '@base' || first === 'BASE') throw new Error('@base is not supported yet.'); // TODO
-    else if (first === '@keywords') throw new Error('@keywords is not supported yet.'); // TODO
     else
         result = { type: 'TripleData', val: [ this._subject(state), this._propertylist(state) ] };
     return result;
@@ -215,12 +221,6 @@ N3Lexer.prototype._expression = function (state)
 
         result = { type: 'RDFLiteral', val: [str, type, lang] };
     }
-    else if (state.startsWith('true') || state.startsWith('false') || state.startsWith('@true') || state.startsWith('@false'))
-    {
-        var first = state.firstWord();
-        result = { type: 'BooleanLiteral', val: first };
-        state.move(first);
-    }
     else if (c >= '0' && c <= '9' || c === '-' || c === '+' || c === '.')
     {
         match = state.extract(N3Lexer._numericalRegex);
@@ -233,8 +233,18 @@ N3Lexer.prototype._expression = function (state)
     }
     else
     {
-        match = state.extract(N3Lexer._prefixIRI);
-        result = { type: 'PrefixedIRI', val: match };
+        // could be a prefix starting with 'true' ...
+        var first = state.firstWord();
+        if (first === 'true' || first === 'false' || first === '@true' || first === '@false')
+        {
+            result = { type: 'BooleanLiteral', val: first };
+            state.move(first);
+        }
+        else
+        {
+            match = state.extract(N3Lexer._prefixIRI);
+            result = { type: 'PrefixedIRI', val: match };
+        }
     }
 
     c = state.firstChar();
@@ -255,9 +265,9 @@ N3LexerState.prototype.firstWord  = function ()      { return this.input.split(N
 N3LexerState.prototype.eof        = function ()      { return this.input.length === 0; };
 N3LexerState.prototype.startsWith = function (match) { return this.input.startsWith(match); };
 
-N3LexerState.prototype.move = function (part)
+N3LexerState.prototype.move = function (part, unsafe)
 {
-    if (!this.input.startsWith(part))
+    if (!unsafe && !this.input.startsWith(part))
         throw new Error("Unexpected input " + part);
     this.moveLength(part.length);
 };
