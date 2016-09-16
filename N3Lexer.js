@@ -28,14 +28,10 @@ N3Lexer._variableRegex = new RegExp(
     '^\\?' + N3Lexer._prefix.source.substring(1)
 );
 N3Lexer._iriRegex = /^<[^>]*>/;
-N3Lexer._stringRegex = /^("|')(\1\1)?(?:[^]*?[^\\])??(?:\\\\)*\2\1/;
-N3Lexer._datatypeRegex = new RegExp(
-    '\\^\\^(?:(?:' + N3Lexer._iriRegex.source.substring(1) + ')|(?:' + N3Lexer._prefixIRI.source.substring(1) + '))'
-);
-N3Lexer._langRegex = /@[a-z]+(-[a-z0-9]+)*/;
 N3Lexer._literalRegex = new RegExp(
-    N3Lexer._stringRegex.source +
-    '((?:' + N3Lexer._datatypeRegex.source + ')|(?:' + N3Lexer._langRegex.source + '))?'
+    '^(' + /("|')(\2\2)?(?:[^]*?[^\\])??(?:\\\\)*\3\2/.source + ')' + // no error since it's nested in a bigger regex
+    '((\\^\\^(?:(?:' + N3Lexer._iriRegex.source.substring(1) + ')|(?:' + N3Lexer._prefixIRI.source.substring(1) + ')))' +
+    '|(' + /@[a-z]+(-[a-z0-9]+)*/.source + '))?'
 );
 N3Lexer._numericalRegex = /^[-+]?(?:(?:(?:(?:[0-9]+\.?[0-9]*)|(?:\.[0-9]+))[eE][-+]?[0-9]+)|(?:[0-9]*(\.[0-9]+))|(?:[0-9]+))/;
 
@@ -205,15 +201,15 @@ N3Lexer.prototype._expression = function (state)
     }
     else if (c === '"' || c === "'")
     {
-        match = state.extract(N3Lexer._literalRegex);
+        match = N3Lexer._literalRegex.exec(state.input);
+        state.move(match[0], true);
 
-        var str = N3Lexer._stringRegex.exec(match);
-        var type = N3Lexer._datatypeRegex.exec(match);
-        var lang = N3Lexer._langRegex.exec(match);
+        var str = match[1];
+        var type = match[5];
+        var lang = match[6];
 
-        str = str[0];
-        type = type && this._expression(new N3LexerState(type[0].substring(2))); // ExplicitIRI or PrefixedIRI
-        lang = lang && lang[0].substring(1);
+        type = type && this._expression(new N3LexerState(type.substring(2))); // ExplicitIRI or PrefixedIRI
+        lang = lang && lang.substring(1);
 
         result = { type: 'RDFLiteral', val: [str, type, lang] };
     }
