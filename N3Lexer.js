@@ -29,7 +29,7 @@ N3Lexer._variableRegex = new RegExp(
 );
 N3Lexer._iriRegex = /^<[^>]*>/;
 N3Lexer._literalRegex = new RegExp(
-    '^(' + /("|')(\2\2)?(?:[^]*?[^\\])??(?:\\\\)*\3\2/.source + ')' + // no error since it's nested in a bigger regex
+    /^(("|')(\2\2)?(?:[^]*?[^\\])??(?:\\\\)*\3\2)/.source +
     '((\\^\\^(?:(?:' + N3Lexer._iriRegex.source.substring(1) + ')|(?:' + N3Lexer._prefixIRI.source.substring(1) + ')))' +
     '|(' + /@[a-z]+(-[a-z0-9]+)*/.source + '))?'
 );
