@@ -185,11 +185,7 @@ N3Lexer.prototype._expression = function (state)
     else if (c === '[')
     {
         state.move(c, true);
-        var propertyList;
-        if (state.firstChar() === ']')
-            propertyList = [];
-        else
-            propertyList = this._propertylist(state);
+        var propertyList = this._propertylist(state);
         state.move(']');
         result = { type: 'BlankTripleData', val: propertyList};
     }
