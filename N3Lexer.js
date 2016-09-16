@@ -256,9 +256,22 @@ N3Lexer.prototype._expression = function (state)
 
 function N3LexerState (input){ this.input = input; this.trimLeft(); }
 
-N3Lexer._trimRegex = /^(?:\s*(?:#.*))*\s*/;
+//N3Lexer._trimRegex = /^(?:\s*(?:#.*))*\s*/;
 N3Lexer._wordRegex = /\s+|([;.,{}[\]()!^])|(<?=>?)/;
-N3LexerState.prototype.trimLeft   = function ()      { this.input = this.input.replace(N3Lexer._trimRegex, ''); };
+//N3LexerState.prototype.trimLeft   = function ()      { this.input = this.input.replace(N3Lexer._trimRegex, ''); };
+N3LexerState.prototype.trimLeft   = function ()
+{
+    this.input = this.input.trimLeft();
+    if (this.input[0] === '#')
+    {
+        var idx = this.input.indexOf('\n');
+        if (idx < 0)
+            this.input = '';
+        else
+            this.input = this.input.substring(idx);
+        this.trimLeft();
+    }
+};
 N3LexerState.prototype.firstChar  = function ()      { return this.input[0]; };
 N3LexerState.prototype.firstChars = function (count) { if (!count || count === 1) return this.input[0]; return this.input.substr(0, count); };
 N3LexerState.prototype.firstWord  = function ()      { return this.input.split(N3Lexer._wordRegex, 1)[0]; };
