@@ -127,7 +127,7 @@ N3Lexer.prototype._predicate = function (state)
 
     var result;
     // TODO: space is not enough for check 2nd character
-    if (c2 === '@a' || c === 'a' && c2 === ' ')
+    if (c2 === '@a' || c2 === 'a ')
     {
         var first = state.firstWord();
         result = { type: 'SymbolicIRI', val: first};
