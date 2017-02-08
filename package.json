@@ -2,9 +2,11 @@
   "name": "n3parser",
   "version": "0.0.2",
   "description": "N3 parser",
+  "author": "Joachim Van Herwegen",
+  "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git@git.mmlab.be:4444/jvherweg/n3parser.git"
+    "url": "https://github.com/joachimvh/N3Parser.js"
   },
   "main": "index.js",
   "dependencies": {
@@ -16,6 +18,5 @@
   },
   "scripts": {
     "test": "mocha"
-  },
-  "author": ""
+  }
 }
