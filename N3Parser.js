@@ -155,7 +155,7 @@ N3Parser.prototype._handlePredicate = function (lex, root, context, unsafe)
         throw 'Input should be an object.';
 
     var result;
-    if (lex.type === 'ExplicitIRI' || lex.type === 'PrefixedIRI')
+    if (lex.type === 'ExplicitIRI' || lex.type === 'PrefixedIRI' || lex.type ==='Variable')
         result = this._parse(lex, root, context, unsafe)['@id'];
     else if (lex.type === 'SymbolicIRI')
     {
