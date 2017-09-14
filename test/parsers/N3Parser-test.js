@@ -247,6 +247,6 @@ describe('N3Parser', function ()
         {
             var jsonld = parser.toJSONLD('[ <> () ;;; ] <> ([ <> () ;;; <> () ]) ;;; <> [ <> () ;;; ].');
             assert.deepEqual(jsonld, { "": [ { "@list": [] }, { "@list": [ { "": [ { "@list": [] }, { "@list": [] } ] } ] }, { "": { "@list": [] } } ] });
-        })
+        });
     });
 });

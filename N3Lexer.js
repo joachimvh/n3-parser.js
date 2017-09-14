@@ -50,7 +50,7 @@ N3Lexer.prototype._parse = function (state)
         var c = state.firstChar();
         statements.push(this._statement(state));
         // PREFIX and BASE
-        if (c !== 'P' && c !== 'B') // TODO: should we check for newlines?
+        if (c !== 'P' && c !== 'p' && c !== 'B' && c !== 'b') // TODO: should we check for newlines?
             state.move('.');
     }
     return { type: 'Document', val: statements };
@@ -60,7 +60,7 @@ N3Lexer.prototype._statement = function (state)
 {
     var c = state.firstChar();
     var result;
-    if (c === '@' || c ==='P' || c === 'B')
+    if (c === '@' || c ==='P' || c === 'p' || c === 'B' || c === 'b')
     {
         var first = state.firstWord();
         if (first === '@forAll')
@@ -73,7 +73,7 @@ N3Lexer.prototype._statement = function (state)
             state.move(first, true);
             result = { type: 'Existential', val: this._objects(state) };
         }
-        else if (first === '@prefix' || first === 'PREFIX')
+        else if (first === '@prefix' || first.toUpperCase() === 'PREFIX') // PREFIX is a case insensitive form
         {
             state.move(first, true);
             var prefix;
@@ -85,7 +85,7 @@ N3Lexer.prototype._statement = function (state)
             var iri = state.extract(N3Lexer._iriRegex);
             result = { type: 'Prefix', val: [prefix, iri] };
         }
-        else if (first === '@base' || first === 'BASE') throw new Error('@base is not supported yet.'); // TODO
+        else if (first === '@base' || first.toUpperCase() === 'BASE') throw new Error('@base is not supported yet.'); // TODO
         else if (first === '@keywords') throw new Error('@keywords is not supported yet.'); // TODO
         else throw new Error('Unsupported keyword ' + first);
     }
@@ -292,7 +292,10 @@ N3LexerState.prototype.extract = function (regex)
 {
     var match = regex.exec(this.input);
     if (!match || regex.lastIndex !== 0)
-        throw new Error("Input didn't match the regex.");
+    {
+        var lines = this.input.split('\n');
+        throw new Error("Input didn't match the regex." + (lines.length ? (' On line \n' + lines[0]) : ''));
+    }
     this.move(match[0], true);
     return match[0];
 };
