@@ -7,6 +7,26 @@ var uuid = require('node-uuid');
 
 function N3Lexer () {}
 
+N3Lexer.terms = {
+    BASE: 'Base',
+    BLANK_TRIPLE_DATA: 'BlankTripleData',
+    BOOLEAN_LITERAL: 'BooleanLiteral',
+    DOCUMENT: 'Document',
+    EXISTENTIAL: 'Existential',
+    EXPLICIT_IRI: 'ExplicitIRI',
+    FORMULA: 'Formula',
+    LIST: 'List',
+    NUMERIC_LITERAL: 'NumericLiteral',
+    PREDICATE_OBJECT: 'PredicateObject',
+    PREFIX: 'Prefix',
+    PREFIXED_IRI: 'PrefixedIRI',
+    RDF_LITERAL: 'RDFLiteral',
+    SYMBOLIC_IRI: 'SymbolicIRI',
+    TRIPLE_DATA: 'TripleData',
+    VARIABLE: 'Variable',
+    UNIVERSAL: 'Universal',
+};
+
 // TODO: check up what reserved escapes are supposed to do http://www.w3.org/TR/turtle/#sec-escapes
 // TODO: 32 bit unicode (use something like http://apps.timwhitlock.info/js/regex# ? or use xregexp with https://gist.github.com/slevithan/2630353 )
 N3Lexer._PN_CHARS_BASE = /^[A-Z_a-z\u00c0-\u00d6\u00d8-\u00f6\u00f8-\u02ff\u0370-\u037d\u037f-\u1fff\u200c-\u200d\u2070-\u218f\u2c00-\u2fef\u3001-\ud7ff\uf900-\ufdcf\ufdf0-\ufffd]/;
@@ -29,7 +49,7 @@ N3Lexer._variableRegex = new RegExp(
 );
 N3Lexer._iriRegex = /^<[^>]*>/;
 N3Lexer._literalRegex = new RegExp(
-    /^(("|')(\2\2)?(?:[^]*?[^\\])??(?:\\\\)*\3\2)/.source +
+    /^((["'])(\2\2)?(?:[^]*?[^\\])??(?:\\\\)*\3\2)/.source +
     '((\\^\\^(?:(?:' + N3Lexer._iriRegex.source.substring(1) + ')|(?:' + N3Lexer._prefixIRI.source.substring(1) + ')))' +
     '|(' + /@[a-z]+(-[a-z0-9]+)*/.source + '))?'
 );
@@ -51,10 +71,10 @@ N3Lexer.prototype._parse = function (state)
         var statement = this._statement(state);
         statements.push(statement);
         // PREFIX and BASE
-        if ((statement.type !== 'Prefix' && statement.type !== 'Base') || c === '@') // TODO: should we check for newlines?
+        if ((statement.type !== N3Lexer.terms.PREFIX && statement.type !== N3Lexer.terms.BASE) || c === '@') // TODO: should we check for newlines?
             state.move('.');
     }
-    return { type: 'Document', val: statements };
+    return { type: N3Lexer.terms.DOCUMENT, val: statements };
 };
 
 N3Lexer.prototype._statement = function (state)
@@ -69,12 +89,12 @@ N3Lexer.prototype._statement = function (state)
         if (first === '@forAll')
         {
             state.move(first, true);
-            result = { type: 'Universal', val: this._objects(state) };
+            result = { type: N3Lexer.terms.UNIVERSAL, val: this._objects(state) };
         }
         else if (first === '@forSome')
         {
             state.move(first, true);
-            result = { type: 'Existential', val: this._objects(state) };
+            result = { type: N3Lexer.terms.EXISTENTIAL, val: this._objects(state) };
         }
         else if (first === '@prefix' || first.toUpperCase() === 'PREFIX') // PREFIX is a case insensitive form
         {
@@ -86,14 +106,14 @@ N3Lexer.prototype._statement = function (state)
                 prefix = state.extract(N3Lexer._prefix);
             state.move(':');
             var iri = state.extract(N3Lexer._iriRegex);
-            result = { type: 'Prefix', val: [prefix, iri] };
+            result = { type: N3Lexer.terms.PREFIX, val: [prefix, iri] };
         }
         else if (first === '@base' || first.toUpperCase() === 'BASE') throw new Error('@base is not supported yet.'); // TODO
         else if (first === '@keywords') throw new Error('@keywords is not supported yet.'); // TODO
         else throw new Error('Unsupported keyword ' + first);
     }
     else
-        result = { type: 'TripleData', val: [ this._subject(state), this._propertylist(state) ] };
+        result = { type: N3Lexer.terms.TRIPLE_DATA, val: [ this._subject(state), this._propertylist(state) ] };
     return result;
 };
 
@@ -109,7 +129,7 @@ N3Lexer.prototype._propertylist = function (state)
     var c = state.firstChar();
     if (N3Lexer._delimiterRegex.exec(c))
         return [];
-    var propertyLists = [{ type: 'PredicateObject', val: [ this._predicate(state), this._objects(state) ] }];
+    var propertyLists = [{ type: N3Lexer.terms.PREDICATE_OBJECT, val: [ this._predicate(state), this._objects(state) ] }];
     while (state.firstChar() === ';')
     {
         // you can have multiple semicolons...
@@ -118,7 +138,7 @@ N3Lexer.prototype._propertylist = function (state)
         // propertylist can end on a semicolon...
         if (N3Lexer._delimiterRegex.exec(state.firstChar()))
             break;
-        propertyLists.push({ type: 'PredicateObject', val: [ this._predicate(state), this._objects(state) ] });
+        propertyLists.push({ type: N3Lexer.terms.PREDICATE_OBJECT, val: [ this._predicate(state), this._objects(state) ] });
     }
     return propertyLists;
 };
@@ -133,17 +153,17 @@ N3Lexer.prototype._predicate = function (state)
     if (c2 === '@a' || c2 === 'a ')
     {
         var first = state.firstWord();
-        result = { type: 'SymbolicIRI', val: first};
+        result = { type: N3Lexer.terms.SYMBOLIC_IRI, val: first};
         state.move(first, true);
     }
-    else if (c === '=' && c2 == '=>' || c2 === '<=')
+    else if (c === '=' && c2 === '=>' || c2 === '<=')
     {
-        result = { type: 'SymbolicIRI', val: c2};
+        result = { type: N3Lexer.terms.SYMBOLIC_IRI, val: c2};
         state.move(c2, true);
     }
     else if (c === '=')
     {
-        result = { type: 'SymbolicIRI', val: c2};
+        result = { type: N3Lexer.terms.SYMBOLIC_IRI, val: c2};
         state.move(c, true);
     }
     else if (c2 === '@h') throw new Error('@has is not supported yet.'); // TODO
@@ -180,14 +200,14 @@ N3Lexer.prototype._expression = function (state)
             state.move('.');
         }
         state.move('}');
-        result = { type: 'Formula', val: statements };
+        result = { type: N3Lexer.terms.FORMULA, val: statements };
     }
     else if (c === '[')
     {
         state.move(c, true);
         var propertyList = this._propertylist(state);
         state.move(']');
-        result = { type: 'BlankTripleData', val: propertyList};
+        result = { type: N3Lexer.terms.BLANK_TRIPLE_DATA, val: propertyList};
     }
     else if (c === '(')
     {
@@ -196,12 +216,12 @@ N3Lexer.prototype._expression = function (state)
         while (state.firstChar() !== ')')
             expressions.push(this._expression(state));
         state.move(')');
-        result = { type: 'List', val: expressions };
+        result = { type: N3Lexer.terms.LIST, val: expressions };
     }
     else if (c === '?')
     {
         match = state.extract(N3Lexer._variableRegex);
-        result = { type: 'Variable', val: match };
+        result = { type: N3Lexer.terms.VARIABLE, val: match };
     }
     else if (c === '"' || c === "'")
     {
@@ -215,12 +235,12 @@ N3Lexer.prototype._expression = function (state)
         type = type && this._expression(new N3LexerState(type.substring(2))); // ExplicitIRI or PrefixedIRI
         lang = lang && lang.substring(1);
 
-        result = { type: 'RDFLiteral', val: [str, type, lang] };
+        result = { type: N3Lexer.terms.RDF_LITERAL, val: [str, type, lang] };
     }
     else if (c >= '0' && c <= '9' || c === '-' || c === '+' || c === '.')
     {
         match = state.extract(N3Lexer._numericalRegex);
-        result = { type: 'NumericLiteral', val: match };
+        result = { type: N3Lexer.terms.NUMERIC_LITERAL, val: match };
     }
     else if (c === '<')
     {
@@ -229,7 +249,7 @@ N3Lexer.prototype._expression = function (state)
             throw new Error('URI closing bracket not found');
         var iri = state.input.substring(0, idx+1);
         state.moveLength(idx+1);
-        result = { type: 'ExplicitIRI', val: iri };
+        result = { type: N3Lexer.terms.EXPLICIT_IRI, val: iri };
     }
     else
     {
@@ -237,13 +257,13 @@ N3Lexer.prototype._expression = function (state)
         var first = state.firstWord();
         if (first === 'true' || first === 'false' || first === '@true' || first === '@false')
         {
-            result = { type: 'BooleanLiteral', val: first };
+            result = { type: N3Lexer.terms.BOOLEAN_LITERAL, val: first };
             state.move(first, true);
         }
         else
         {
             match = state.extract(N3Lexer._prefixIRI);
-            result = { type: 'PrefixedIRI', val: match };
+            result = { type: N3Lexer.terms.PREFIXED_IRI, val: match };
         }
     }
 
