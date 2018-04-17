@@ -1,6 +1,6 @@
 {
-  "name": "n3parser",
-  "version": "0.0.4",
+  "name": "n3-parser",
+  "version": "0.1.0",
   "description": "N3 parser",
   "author": "Joachim Van Herwegen",
   "license": "MIT",
@@ -18,5 +18,12 @@
   },
   "scripts": {
     "test": "mocha"
-  }
+  },
+  "files": [
+    "index.js",
+    "JSONLDParser.js",
+    "N3Lexer.js",
+    "N3Parser.js",
+    "Util.js"
+  ]
 }
