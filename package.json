@@ -1,17 +1,17 @@
 {
-  "name": "n3-parser",
-  "version": "0.1.0",
+  "name": "n3-parser.js",
+  "version": "0.1.1",
   "description": "N3 parser",
   "author": "Joachim Van Herwegen",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/joachimvh/n3-parser"
+    "url": "https://github.com/joachimvh/n3-parser.js"
   },
   "main": "index.js",
   "dependencies": {
     "lodash": "^4.0.0",
-    "node-uuid": "^1.4.3"
+    "uuid": "^3.2.1"
   },
   "devDependencies": {
     "mocha": "^2.3.4"

@@ -4,7 +4,7 @@
 
 var N3Lexer = require('./N3Lexer');
 var Util = require('./Util');
-var uuid = require('node-uuid');
+var uuid = require('uuid');
 var _ = require('lodash');
 
 function N3Parser () {}
