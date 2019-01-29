@@ -7,8 +7,11 @@ though not all JSON-LD features are supported in that conversion
 
 ## Usage
 
+Install with npm using `npm install n3-parser.js`.
+
+
 ```javascript
-const N3Parser = require('n3parser').N3Parser;
+const N3Parser = require('n3-parser.js').N3Parser;
 
 let parser = new N3Parser();
 let jsonld = parser.toJSONLD(`PREFIX dc: <http://purl.org/dc/elements/1.1/>
@@ -24,7 +27,7 @@ console.log(jsonld);
 //  'dc:title': 'Tony Benn',
 //  'dc:publisher': 'Wikipedia' }
 
-const JSONLDParser = require('n3parser').JSONLDParser;
+const JSONLDParser = require('n3-parser.js').JSONLDParser;
 let jsonldParser = new JSONLDParser();
 let n3 = jsonldParser.toN3(jsonld);
 console.log(n3);
