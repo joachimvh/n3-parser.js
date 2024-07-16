@@ -98,6 +98,9 @@ N3Parser.prototype._parse = function (lex, root, context, unsafe)
                 predicate = predicate['@id'];
             }
             var objects = _.map(po.val[1], function (thingy) { return this._parse(thingy, root, context, unsafe); }.bind(this));
+            // Literals would use @type for both datatype and rdf:type, this gets around that, sort of
+            if (result['@value'] !== undefined && predicate === '@type')
+                predicate = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type';
             if (!(predicate in result))
                 result[predicate] = objects;
             else

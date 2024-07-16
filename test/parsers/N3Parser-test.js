@@ -135,6 +135,17 @@ describe('N3Parser', function ()
                                      {  "@id": "a:a", "x:b": { "@id": "x:c" } }]} ;
             assert.deepEqual(jsonld, expected);
         });
+
+        it('should support both datatype and rdf:type', function ()
+        {
+            var jsonld = parser.toJSONLD('@prefix xsd: <http://www.w3.org/2001/XMLSchema#>. "a"^^xsd:integer a <c>.');
+            var expected = {
+                "@context": {
+                    "xsd": "http://www.w3.org/2001/XMLSchema#"
+                },
+                "@value":"a", "@type": "xsd:integer", "http://www.w3.org/1999/02/22-rdf-syntax-ns#type": { "@id": "c" }};
+            assert.deepEqual(jsonld, expected);
+        });
     });
 
     describe('lists', function ()
