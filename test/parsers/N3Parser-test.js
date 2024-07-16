@@ -221,8 +221,8 @@ describe('N3Parser', function ()
     {
         it('merges triples with identical subjects and predicates', function ()
         {
-            var jsonld = parser.toJSONLD('<a> <b> <c>. <a> <b> <d>. <c> <d> <e>. <c> <e> <d>. ');
-            assert.deepEqual(jsonld, {'@id':'a',b:[{'@id':'c',d:{'@id':'e'},e:{'@id':'d'}},{'@id':'d'}]});
+            var jsonld = parser.toJSONLD('<a> <b> <c>. <a> <b> <d>. <c> <d> <e>. <c> <e> <d>, <f>. ');
+            assert.deepEqual(jsonld, {'@id':'a',b:[{'@id':'c',d:{'@id':'e'},e:[{'@id':'d'},{'@id':'f'}]},{'@id':'d'}]});
         });
 
         it('can handle loops in the triple data', function ()

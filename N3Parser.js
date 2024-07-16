@@ -23,6 +23,7 @@ N3Parser.prototype.toJSONLD = function (input)
 
     // do this before removing default graph so everything has at least 1 reference
     this._compact(jsonld);
+    this._cleanTypes(jsonld);
 
     // default graph is not necessary if there is only 1 root node
     if (jsonld['@graph'] && jsonld['@graph'].length === 1 && _.every(jsonld, function (val, key) { return key === '@context' || key === '@graph'; }))
@@ -378,6 +379,24 @@ N3Parser.prototype._mergeNodes = function (objectA, objectB)
     }
     return objectA;
 };
+
+// Workaround for the fact that @type: null can remain when parsing for example '<a> <b> <c>. <a> <b> <d>. <c> <e> <d>, <f>.'
+// The reason is that the references can get modified afterwards, accidentally introducing @type: null.
+// A better solution would be a better implementation of _compact.
+N3Parser.prototype._cleanTypes = function (jsonld)
+{
+    if (Util.isLiteral(jsonld)) {
+        return jsonld;
+    }
+    for (const key in jsonld)
+    {
+        if (key === '@type' && !jsonld[key]) {
+            delete jsonld[key];
+        } else {
+            this._cleanTypes(jsonld[key]);
+        }
+    }
+}
 
 module.exports = N3Parser;
 
